@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Kontrola, testy a Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalace závislostí
+        run: npm ci --no-audit --no-fund
+
+      - name: Prisma Client
+        run: npm run db:generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typová kontrola
+        run: npm run typecheck
+
+      - name: Unit a integrační testy
+        run: npm test
+
+      - name: Migrace odpovídají schématu
+        run: npm run db:check
+
+      - name: Build
+        run: npm run build
+
+      - name: Prohlížeč pro E2E
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E (next start)
+        run: npm run e2e
+
+      - name: Docker image
+        run: docker build -t fakturace:ci .
+
+      - name: E2E proti Docker image (svazek připojený jako root)
+        env:
+          E2E_BASE_URL: http://localhost:3300
+          E2E_SETUP_TOKEN: ci-setup-token-0123456789
+        run: |
+          mkdir -p "$RUNNER_TEMP/data"
+          docker run -d --name fakturace -p 3300:3000 \
+            -v "$RUNNER_TEMP/data:/data" \
+            -e APP_URL=http://localhost:3300 \
+            -e BETTER_AUTH_SECRET=ci-secret-0123456789-ci-secret-0123456789 \
+            -e SETUP_TOKEN="$E2E_SETUP_TOKEN" \
+            fakturace:ci
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:3300/api/zdravi && break
+            sleep 1
+          done
+          curl -fsS http://localhost:3300/api/zdravi
+          npm run e2e
+          # aplikace nesmí běžet jako root
+          test "$(docker exec fakturace stat -c %U /proc/1)" = "node"
+
+      - name: Logy kontejneru
+        if: always()
+        run: docker logs fakturace 2>&1 || true
