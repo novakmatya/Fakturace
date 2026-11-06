@@ -1,0 +1,329 @@
+// Datový model aplikace Fakturace.
+// Konvence: peníze = Int v haléřích, procenta = Int v setinách procenta,
+// množství = Int v tisícinách, kalendářní data = text RRRR-MM-DD (Europe/Prague).
+// Migrace jsou ručně psané SQL v prisma/migrations (viz README); CI ověřuje,
+// že odpovídají tomuto schématu (prisma migrate diff).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ---------------------------------------------------------------------------
+// Nastavení
+// ---------------------------------------------------------------------------
+
+model AppSettings {
+  id                Int      @id @default(1)
+  roundInvoiceTotal Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model SupplierProfile {
+  id             Int      @id @default(1)
+  name           String
+  street         String
+  city           String
+  zip            String
+  country        String   @default("CZ")
+  ico            String?
+  dic            String?
+  bankAccount    String
+  iban           String
+  bic            String?
+  registerText   String?
+  email          String?
+  phone          String?
+  web            String?
+  logoFileId     String?
+  defaultDueDays Int      @default(14)
+  vatMode        String   @default("NEPLATCE")
+  vatNote        String   @default("Nejsem plátce DPH.")
+  footerText     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+/// Činnost = zdroj příjmu. Určuje paragraf (§ 7 / § 9) faktury.
+
+model IncomeSource {
+  id                String          @id @default(cuid())
+  name              String
+  section           String
+  pausalCategory    String?
+  shareNumerator    Int             @default(1)
+  shareDenominator  Int             @default(1)
+  printIco          Boolean         @default(true)
+  printRegisterText Boolean         @default(true)
+  archived          Boolean         @default(false)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  invoices          Invoice[]
+  customers         Customer[]
+  plans             RecurringPlan[]
+}
+
+model Customer {
+  id                    String          @id @default(cuid())
+  kind                  String
+  name                  String
+  street                String
+  city                  String
+  zip                   String
+  country               String          @default("CZ")
+  ico                   String?
+  dic                   String?
+  email                 String?
+  emailCc               String?
+  defaultIncomeSourceId String?
+  defaultDueDays        Int?
+  remindersEnabled      Boolean         @default(true)
+  aresData              String?
+  aresFetchedAt         DateTime?
+  note                  String?
+  archived              Boolean         @default(false)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  defaultIncomeSource   IncomeSource?   @relation(fields: [defaultIncomeSourceId], references: [id])
+  invoices              Invoice[]
+  plans                 RecurringPlan[]
+
+  @@index([ico])
+  @@index([name])
+}
+
+// ---------------------------------------------------------------------------
+// Doklady
+// ---------------------------------------------------------------------------
+
+model NumberSeries {
+  id         String @id @default(cuid())
+  docType    String
+  year       Int
+  lastNumber Int    @default(0)
+
+  @@unique([docType, year])
+}
+
+/// Faktura nebo dobropis. Po vystavení je obsah neměnný (hlídají triggery).
+
+model Invoice {
+  id                String         @id @default(cuid())
+  type              String         @default("FAKTURA")
+  status            String         @default("KONCEPT")
+  number            String?
+  seriesYear        Int?
+  customerId        String
+  incomeSourceId    String
+  incomeSection     String
+  pausalCategory    String?
+  shareNumerator    Int            @default(1)
+  shareDenominator  Int            @default(1)
+  issueDate         String
+  dueDate           String
+  supplyDate        String?
+  variableSymbol    String?
+  constantSymbol    String?
+  specificSymbol    String?
+  currency          String         @default("CZK")
+  paymentMethod     String         @default("PREVOD")
+  totalHalere       Int            @default(0)
+  roundingHalere    Int            @default(0)
+  amountDueHalere   Int            @default(0)
+  note              String?
+  supplierSnapshot  String?
+  customerSnapshot  String?
+  pdfFileId         String?        @unique
+  pdfSha256         String?
+  issuedAt          DateTime?
+  cancelledAt       DateTime?
+  cancelReason      String?
+  correctsInvoiceId String?
+  recurringPlanId   String?
+  periodKey         String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  customer          Customer       @relation(fields: [customerId], references: [id])
+  incomeSource      IncomeSource   @relation(fields: [incomeSourceId], references: [id])
+  lines             InvoiceLine[]
+  correctsInvoice   Invoice?       @relation("CreditNotes", fields: [correctsInvoiceId], references: [id])
+  creditNotes       Invoice[]      @relation("CreditNotes")
+  recurringPlan     RecurringPlan? @relation(fields: [recurringPlanId], references: [id])
+  pdfFile           FileObject?    @relation(fields: [pdfFileId], references: [id])
+
+  @@unique([type, number])
+  @@unique([recurringPlanId, periodKey])
+  @@index([customerId])
+  @@index([issueDate])
+  @@index([status])
+}
+
+model InvoiceLine {
+  id              String  @id @default(cuid())
+  invoiceId       String
+  position        Int
+  description     String
+  quantityMilli   Int
+  unit            String?
+  unitPriceHalere Int
+  totalHalere     Int
+  kind            String  @default("STANDARD")
+  invoice         Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model FileObject {
+  id           String   @id @default(cuid())
+  kind         String
+  storagePath  String   @unique
+  originalName String?
+  mimeType     String
+  sizeBytes    Int
+  sha256       String
+  createdAt    DateTime @default(now())
+  invoice      Invoice?
+}
+
+// ---------------------------------------------------------------------------
+// Opakované faktury (logika přibude v kroku 7)
+// ---------------------------------------------------------------------------
+
+model RecurringPlan {
+  id                 String              @id @default(cuid())
+  name               String
+  customerId         String
+  incomeSourceId     String
+  frequency          String
+  dayOfMonth         Int
+  dueDays            Int
+  autoIssue          Boolean             @default(false)
+  autoSend           Boolean             @default(false)
+  startDate          String
+  endDate            String?
+  nextRunDate        String
+  active             Boolean             @default(true)
+  periodTextTemplate String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  customer           Customer            @relation(fields: [customerId], references: [id])
+  incomeSource       IncomeSource        @relation(fields: [incomeSourceId], references: [id])
+  lines              RecurringPlanLine[]
+  invoices           Invoice[]
+}
+
+model RecurringPlanLine {
+  id              String        @id @default(cuid())
+  planId          String
+  position        Int
+  description     String
+  quantityMilli   Int
+  unit            String?
+  unitPriceHalere Int
+  kind            String        @default("STANDARD")
+  plan            RecurringPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+}
+
+// ---------------------------------------------------------------------------
+// Audit
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  at         DateTime @default(now())
+  actor      String
+  action     String
+  entityType String?
+  entityId   String?
+  details    String?
+
+  @@index([at])
+  @@index([entityType, entityId])
+}
+
+model User {
+  id               String      @id
+  name             String
+  email            String
+  emailVerified    Boolean     @default(false)
+  image            String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  twoFactorEnabled Boolean?    @default(false)
+  sessions         Session[]
+  accounts         Account[]
+  twofactors       TwoFactor[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model TwoFactor {
+  id                      String    @id
+  secret                  String
+  backupCodes             String
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verified                Boolean?  @default(true)
+  failedVerificationCount Int?      @default(0)
+  lockedUntil             DateTime?
+
+  @@index([secret])
+  @@index([userId])
+  @@map("twoFactor")
+}

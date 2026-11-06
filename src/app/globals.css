@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-canvas: #fafaf7;
+  --color-surface: #ffffff;
+  --color-panel: #f5f4f0;
+  --color-ink: #1c1c1a;
+  --color-muted: #6b6a65;
+  --color-faint: #9a988f;
+  --color-line: #e7e5df;
+  --color-accent: #1f3a5f;
+  --color-accent-strong: #15294a;
+  --color-accent-soft: #e9eef4;
+  --color-ok: #2f6b4f;
+  --color-ok-soft: #e7f1eb;
+  --color-warn: #8a5a00;
+  --color-warn-soft: #f8f0dd;
+  --color-danger: #9b2c2c;
+  --color-danger-soft: #f8e8e6;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  ::selection {
+    background: var(--color-accent-soft);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+@utility label-caps {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
