@@ -171,6 +171,8 @@ model Invoice {
   pdfFile           FileObject?    @relation(fields: [pdfFileId], references: [id])
   emails            EmailMessage[]
   payments          Payment[]
+  /// APP = vystavená v aplikaci (číselná řada), IMPORT = převzatá starší faktura s původním číslem.
+  origin            String         @default("APP")
 
   @@unique([type, number])
   @@unique([recurringPlanId, periodKey])

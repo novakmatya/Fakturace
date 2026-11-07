@@ -61,8 +61,11 @@ export function expectedTriggers(root = ROOT) {
     const file = path.join(dir, name, "migration.sql");
     if (!fs.existsSync(file)) continue;
     const sql = fs.readFileSync(file, "utf8");
-    for (const m of sql.matchAll(/CREATE\s+TRIGGER\s+(?:IF\s+NOT\s+EXISTS\s+)?"?(\w+)"?/gi)) names.add(m[1]);
-    for (const m of sql.matchAll(/DROP\s+TRIGGER\s+(?:IF\s+EXISTS\s+)?"?(\w+)"?/gi)) names.delete(m[1]);
+    // v pořadí příkazů: DROP a nové CREATE stejného triggeru v jedné migraci = trigger existuje
+    for (const m of sql.matchAll(/(CREATE|DROP)\s+TRIGGER\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?"?(\w+)"?/gi)) {
+      if (m[1].toUpperCase() === "CREATE") names.add(m[2]);
+      else names.delete(m[2]);
+    }
   }
   return [...names].sort();
 }

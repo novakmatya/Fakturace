@@ -62,6 +62,10 @@ async function issueAndRedirect(id: string, options: { send?: boolean } = {}): P
     revalidatePath(`/faktury/${id}`);
     return { ok: false, error: userMessage(error) };
   }
+  return finishIssued(id, options);
+}
+
+async function finishIssued(id: string, options: { send?: boolean } = {}): Promise<DraftFormState> {
   // PDF se vyrábí po potvrzení vystavení; když selže, detail nabídne nový pokus.
   let pdfReady = false;
   try {
@@ -97,4 +101,22 @@ export async function regeneratePdfAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   await ensureInvoicePdf(id);
   revalidatePath(`/faktury/${id}`);
+}
+
+/** Rychlá měsíční faktura z přehledu: stejný odběratel a činnost, nový popis a částka. */
+export async function quickInvoiceAction(_prev: DraftFormState | null, formData: FormData): Promise<DraftFormState> {
+  await requireUser();
+  let id: string;
+  try {
+    const { issueQuickInvoice } = await import("@/lib/invoices/quick");
+    const invoice = await issueQuickInvoice({
+      description: String(formData.get("description") ?? ""),
+      amount: String(formData.get("amount") ?? ""),
+    });
+    id = invoice.id;
+  } catch (error) {
+    return { ok: false, error: userMessage(error) };
+  }
+  // vystaveno – zbytek (PDF, e-mail, přesměrování) jako u běžné faktury
+  return finishIssued(id, { send: formData.get("send") === "on" });
 }

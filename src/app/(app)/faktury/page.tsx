@@ -38,7 +38,14 @@ export default async function InvoicesPage({ searchParams }: PageProps<"/faktury
       <PageHeader
         title="Faktury"
         description="Vystavené doklady jsou neměnné. Opravu nebo storno řeší dobropis."
-        actions={<ButtonLink href="/faktury/nova">Nová faktura</ButtonLink>}
+        actions={
+          <>
+            <ButtonLink href="/faktury/prevzit" variant="secondary">
+              Převzít starší
+            </ButtonLink>
+            <ButtonLink href="/faktury/nova">Nová faktura</ButtonLink>
+          </>
+        }
       />
       {query.smazano ? (
         <div className="mb-6">

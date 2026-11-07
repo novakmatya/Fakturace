@@ -10,14 +10,15 @@ services:
     ports:
       # jen localhost – z jiného počítače v síti se k aplikaci nikdo nedostane
       - "127.0.0.1:3000:3000"
-    env_file: .env
+    # nastavení leží mimo složku aplikace, aby přežilo nahrazení novou verzí
+    env_file: ${FAKTURACE_ENV:?Spouštějte přes Spustit Fakturaci.command}
     environment:
       APP_URL: http://localhost:3000
       DATA_DIR: /data
       BACKUP_DIR: /zalohy
     volumes:
       - data:/data
-      - ${ZALOHY_DIR:?Chybí ZALOHY_DIR v souboru .env}:/zalohy
+      - ${ZALOHY_DIR:?Chybí ZALOHY_DIR v nastavení}:/zalohy
 
 volumes:
   data:

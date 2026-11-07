@@ -6,10 +6,13 @@ import { daysBetween, formatCzDate, todayPrague, yearOf } from "@/lib/dates";
 import { failedEmailCount } from "@/lib/email/outbox";
 import { displayStatus, invoiceStatusBadge, paidHalere, STATUS_INCLUDE } from "@/lib/invoices/display";
 import { formatCzk } from "@/lib/money";
+import { emailConfig } from "@/lib/email/config";
+import { quickInvoiceDefaults } from "@/lib/invoices/quick";
 import { cashIncome } from "@/lib/payments/income";
 import { requireUser } from "@/lib/session";
 import { getAppSettings } from "@/lib/settings";
 import { czPlural } from "@/lib/text";
+import { QuickInvoiceCard } from "./quick-invoice";
 
 export const metadata: Metadata = { title: "Přehled" };
 
@@ -30,7 +33,8 @@ export default async function DashboardPage() {
   const from = `${year}-01-01`;
   const to = `${year}-12-31`;
 
-  const [settings, supplier, sourceCount, customerCount, issued, drafts, recent, open, income, failedEmails] = await Promise.all([
+  const [quick, settings, supplier, sourceCount, customerCount, issued, drafts, recent, open, income, failedEmails] = await Promise.all([
+    quickInvoiceDefaults(),
     getAppSettings(),
     prisma.supplierProfile.findUnique({ where: { id: 1 }, select: { id: true } }),
     prisma.incomeSource.count({ where: { archived: false } }),
@@ -80,6 +84,28 @@ export default async function DashboardPage() {
         description={`Přehled roku ${year}.`}
         actions={<ButtonLink href="/faktury/nova">Nová faktura</ButtonLink>}
       />
+
+      {quick ? (
+        <div className="mb-6">
+          <QuickInvoiceCard
+            customerName={quick.customerName}
+            customerEmail={quick.customerEmail}
+            description={quick.description}
+            lastAmount={formatCzk(quick.lastAmountHalere)}
+            canSend={Boolean(quick.customerEmail) && emailConfig().mode !== "off" && settings.emailAutoSendOnIssue}
+          />
+        </div>
+      ) : supplier && customerCount > 0 ? (
+        <div className="mb-6">
+          <Alert tone="accent" title="Začněte převzetím starších faktur">
+            Nahrajte faktury vystavené dřív jinde – daňový přehled pak bude za celý rok úplný a další faktura se vystaví jedním
+            klikem.{" "}
+            <Link href="/faktury/prevzit" className="font-medium underline">
+              Převzít starší faktury
+            </Link>
+          </Alert>
+        </div>
+      ) : null}
 
       {failedEmails > 0 ? (
         <div className="mb-6">

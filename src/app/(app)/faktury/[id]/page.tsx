@@ -97,7 +97,8 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
   const badge = statusBadge(status);
   const title = invoice.type === "DOBROPIS" ? "Dobropis" : "Faktura";
   const [emails, payments] = await Promise.all([listEmailsForInvoice(invoice.id), listPayments(invoice.id)]);
-  const canSend = invoice.type === "FAKTURA" && invoice.status === "VYSTAVENA" && emailConfig().mode !== "off";
+  const canSend =
+    invoice.type === "FAKTURA" && invoice.origin === "APP" && invoice.status === "VYSTAVENA" && emailConfig().mode !== "off";
   const alreadySent = emails.some((e) => e.status === "SENT" && e.kind === "INVOICE");
 
   return (

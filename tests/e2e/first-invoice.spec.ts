@@ -143,4 +143,24 @@ test("od instalace k vystavené faktuře s PDF", async ({ page }) => {
   await expect(page.getByText(`Přijato ${pragueYear}`)).toBeVisible();
   await expect(page.getByText("3 000,00 Kč").first()).toBeVisible();
   await page.screenshot({ path: path.join(shots, "10-prehled.png"), fullPage: true });
+
+  // 11) Další měsíc jedním formulářem: stejný odběratel, jen nová částka
+  await expect(page.getByRole("heading", { name: /Nová faktura pro Žluťoučká/ })).toBeVisible();
+  await page.getByLabel("Částka (Kč)").fill("2 500");
+  await page.getByRole("button", { name: "Vystavit a odeslat" }).click();
+  await expect(page.getByText(`Faktura ${pragueYear}0002 je vystavená`)).toBeVisible();
+
+  // 12) Převzetí starší faktury vystavené mimo aplikaci
+  await page.goto("/faktury/prevzit");
+  await page.getByLabel("Číslo faktury").fill("2025012");
+  await page.getByLabel("Vystaveno").fill("2025-12-01");
+  await page.getByLabel("Splatnost").fill("2025-12-15");
+  await page.getByLabel("Částka (Kč)").fill("12 000");
+  await page.getByLabel("Popis").fill("Právní služby za prosinec 2025");
+  await page.getByLabel("Uhrazeno dne").fill("2025-12-10");
+  await page.getByRole("button", { name: "Převzít fakturu" }).click();
+  await expect(page.getByText(/Faktura 2025012 .* je převzatá/)).toBeVisible();
+  await expect(page.getByLabel("Číslo faktury")).toHaveValue("2025013");
+  await expect(page.getByLabel("Popis")).toHaveValue("Právní služby za leden 2026");
+  await page.screenshot({ path: path.join(shots, "11-prevzit.png"), fullPage: true });
 });

@@ -57,6 +57,8 @@ export async function ensureInvoicePdf(id: string) {
   const invoice = await loadIssued(id);
   if (!invoice) throw new Error("Doklad neexistuje.");
   if (invoice.pdfFile) return invoice.pdfFile;
+  // Převzatá faktura má jen originál (pokud byl nahrán) – nový „originál“ se nevyrábí.
+  if (invoice.origin === "IMPORT") throw new Error("Převzatá faktura nemá nahrané PDF originálu.");
 
   const data = toPdfData(invoice);
   const { pdf } = await renderInvoicePdf(data);

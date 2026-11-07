@@ -58,9 +58,8 @@ jobs:
       - name: Balíček pro Mac (compose a spouštěč)
         run: |
           bash -n "mac/Spustit Fakturaci.command"
-          touch mac/.env
-          ZALOHY_DIR=/tmp docker compose -f mac/docker-compose.yml config --quiet
-          rm mac/.env
+          echo "ZALOHY_DIR=/tmp" > "$RUNNER_TEMP/nastaveni.env"
+          FAKTURACE_ENV="$RUNNER_TEMP/nastaveni.env" docker compose -f mac/docker-compose.yml --env-file "$RUNNER_TEMP/nastaveni.env" config --quiet
 
       - name: E2E proti Docker image (svazek připojený jako root)
         env:

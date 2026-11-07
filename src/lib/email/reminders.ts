@@ -43,6 +43,7 @@ export async function findDueReminders(today: string, settings: ReminderSettings
     where: {
       type: "FAKTURA",
       status: "VYSTAVENA",
+      origin: "APP",
       dueDate: { lt: today },
       customer: { remindersEnabled: true, email: { not: null } },
     },

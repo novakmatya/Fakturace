@@ -33,6 +33,8 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  // Nahrání PDF převzaté faktury (originály bývají do pár MB).
+  experimental: { serverActions: { bodySizeLimit: "10mb" } },
   // Soukromá aplikace s daty za přihlášením: vše se renderuje dynamicky.
   cacheComponents: false,
   serverExternalPackages: ["better-sqlite3", "@prisma/adapter-better-sqlite3", "@react-pdf/renderer", "tar"],

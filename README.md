@@ -38,6 +38,8 @@ a každý den se šifrovaně zálohují do iCloud Drive (složka `Fakturace-zalo
 3. Při prvním spuštění se zobrazí **heslo k zálohám** (uložte ho do aplikace Hesla)
    a **instalační kód** pro založení účtu. První sestavení trvá asi 5 minut.
 4. Aplikace se pak spouští sama s Dockerem; spouštěč stačí k otevření nebo po aktualizaci.
+   Nastavení a tajné klíče jsou v `~/Library/Application Support/Fakturace/nastaveni.env`,
+   data v Docker svazku – novou verzi lze nasadit prostým nahrazením složky aplikace.
 
 Obnova ze zálohy: `node scripts/restore-backup.mjs <soubor.fakz> <prázdná-složka>`.
 Doporučení: zapněte FileVault (šifrování disku).

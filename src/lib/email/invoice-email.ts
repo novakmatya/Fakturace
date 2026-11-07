@@ -85,6 +85,7 @@ async function loadIssuedInvoice(invoiceId: string) {
   if (!invoice.number) throw new InvoiceEmailError("Koncept nelze odeslat – nejdřív ho vystavte.");
   if (invoice.type !== "FAKTURA") throw new InvoiceEmailError("Odesílání dobropisů přibude s dobropisy.");
   if (invoice.status !== "VYSTAVENA") throw new InvoiceEmailError("Stornovaný doklad se neodesílá.");
+  if (invoice.origin === "IMPORT") throw new InvoiceEmailError("Převzatá starší faktura se z aplikace neodesílá.");
   return invoice;
 }
 

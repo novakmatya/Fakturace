@@ -19,15 +19,21 @@ if ! docker info >/dev/null 2>&1; then
   docker info >/dev/null 2>&1 || { zprava "Docker Desktop se nespustil. Spusťte ho ručně a zkuste to znovu."; exit 1; }
 fi
 
-# 2) První spuštění: tajné klíče a složka pro zálohy
-if [ ! -f .env ]; then
+# 2) První spuštění: tajné klíče a složka pro zálohy. Nastavení je mimo složku
+#    aplikace, takže nahrazení aplikace novou verzí nic nesmaže.
+CONFIG_DIR="$HOME/Library/Application Support/Fakturace"
+export FAKTURACE_ENV="$CONFIG_DIR/nastaveni.env"
+mkdir -p "$CONFIG_DIR"
+# starší verze měla nastavení přímo ve složce mac/.env – převezme se beze změny hesel
+if [ ! -f "$FAKTURACE_ENV" ] && [ -f .env ]; then mv .env "$FAKTURACE_ENV"; chmod 600 "$FAKTURACE_ENV"; fi
+if [ ! -f "$FAKTURACE_ENV" ]; then
   ICLOUD="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
   if [ -d "$ICLOUD" ]; then ZALOHY="$ICLOUD/Fakturace-zalohy"; else ZALOHY="$HOME/Documents/Fakturace-zalohy"; fi
   mkdir -p "$ZALOHY"
   SETUP_TOKEN="$(openssl rand -hex 8)"
   BACKUP_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-24)"
   umask 077
-  cat > .env <<ENV
+  cat > "$FAKTURACE_ENV" <<ENV
 # Fakturace – tajné hodnoty. Soubor nikomu neposílejte.
 BETTER_AUTH_SECRET=$(openssl rand -base64 32)
 SETUP_TOKEN=$SETUP_TOKEN
@@ -49,7 +55,7 @@ fi
 
 # 3) Sestavení (poprvé a po aktualizaci) a spuštění
 echo "Spouštím Fakturaci…"
-docker compose up -d --build
+docker compose --env-file "$FAKTURACE_ENV" up -d --build
 for _ in $(seq 1 60); do
   curl -fsS http://localhost:3000/api/zdravi >/dev/null 2>&1 && break
   sleep 2

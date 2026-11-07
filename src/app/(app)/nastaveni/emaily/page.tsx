@@ -174,7 +174,8 @@ function GmailSetup({ configured, secret }: { configured: boolean; secret: strin
       title: "Proměnné",
       body: (
         <>
-          Na Macu je klíč <code>GMAIL_RELAY_SECRET</code> už vygenerovaný v souboru <code>.env</code> ve složce Fakturace;
+          Na Macu je klíč <code>GMAIL_RELAY_SECRET</code> už vygenerovaný v souboru{" "}
+          <code>~/Library/Application Support/Fakturace/nastaveni.env</code>;
           na Railway ho nastavte v proměnných služby (výstup <code>openssl rand -hex 24</code>). Doplňte i{" "}
           <code>MAIL_FROM</code> ve tvaru <code>Jméno Příjmení &lt;vas.ucet@gmail.com&gt;</code>.
           {secret ? " Klíč je nastavený a níže ve skriptu už je doplněný." : " Po uložení a restartu aplikace se klíč objeví ve skriptu níže."}
@@ -209,7 +210,7 @@ function GmailSetup({ configured, secret }: { configured: boolean; secret: strin
       body: (
         <>
           Zkopírujte URL webové aplikace (končí <code>/exec</code>) a uložte ji jako <code>GMAIL_RELAY_URL</code> – na Macu
-          do souboru <code>.env</code> a znovu spusťte Fakturaci, na Railway do proměnných služby. Pak tady klikněte na
+          do souboru <code>nastaveni.env</code> (viz bod 1) a znovu spusťte Fakturaci, na Railway do proměnných služby. Pak tady klikněte na
           Ověřit spojení a pošlete si zkušební e-mail.
         </>
       ),
