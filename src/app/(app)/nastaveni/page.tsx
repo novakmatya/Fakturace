@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Card, CardTitle, PageHeader } from "@/components/ui";
+import { emailConfig } from "@/lib/email/config";
 import { requireUser } from "@/lib/session";
 import { getAppSettings, getSupplier, listIncomeSources } from "@/lib/settings";
 import { AppSettingsForm } from "./app-settings-form";
@@ -18,6 +19,14 @@ export default async function SettingsPage() {
           .map(([key, value]) => [key, value === null ? "" : String(value)]),
       )
     : { country: "CZ", defaultDueDays: "14", vatNote: "Nejsem plátce DPH." };
+
+  const email = emailConfig();
+  const emailHint =
+    email.mode === "resend"
+      ? `Odesílání zapnuto (${email.from.address}).`
+      : email.mode === "file"
+        ? "Vývojový režim – e-maily se jen ukládají."
+        : "Odesílání zatím není nastavené.";
 
   return (
     <>
@@ -46,6 +55,12 @@ export default async function SettingsPage() {
           <Card>
             <CardTitle>Faktury</CardTitle>
             <AppSettingsForm roundInvoiceTotal={settings.roundInvoiceTotal} />
+          </Card>
+          <Card>
+            <CardTitle hint={emailHint}>E-maily</CardTitle>
+            <Link href="/nastaveni/emaily" className="text-sm font-medium text-accent hover:underline">
+              Šablona a odesílání →
+            </Link>
           </Card>
           <Card>
             <CardTitle hint="Přihlášení heslem a kódem z ověřovací aplikace.">Zabezpečení</CardTitle>

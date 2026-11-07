@@ -1,6 +1,7 @@
 import { audit } from "@/lib/audit";
 import { todayPrague, yearOf } from "@/lib/dates";
 import { prisma, type Tx } from "@/lib/db";
+import { SENT_EMAILS_COUNT } from "@/lib/invoices/display";
 import type { DraftData } from "@/lib/invoices/draft-schema";
 import { allocateNumber } from "@/lib/invoices/numbering";
 import type { CustomerSnapshot, DocType, SupplierSnapshot } from "@/lib/invoices/types";
@@ -249,18 +250,35 @@ export async function getInvoice(id: string) {
       correctsInvoice: { select: { id: true, number: true } },
       creditNotes: { select: { id: true, number: true, status: true } },
       pdfFile: true,
+      ...SENT_EMAILS_COUNT,
     },
   });
+}
+
+/** Filtr stavu: uložené stavy + odvozené ODESLANA / NEODESLANA (podle logu e-mailů). */
+function statusWhere(status: string | undefined) {
+  const sent = { some: { kind: "INVOICE", status: "SENT" } };
+  switch (status) {
+    case undefined:
+    case "":
+      return {};
+    case "ODESLANA":
+      return { status: "VYSTAVENA", emails: sent };
+    case "NEODESLANA":
+      return { status: "VYSTAVENA", type: "FAKTURA", emails: { none: { kind: "INVOICE", status: "SENT" } } };
+    default:
+      return { status };
+  }
 }
 
 export async function listInvoices(filter: { year?: number; status?: string; customerId?: string } = {}) {
   return prisma.invoice.findMany({
     where: {
       ...(filter.year ? { issueDate: { gte: `${filter.year}-01-01`, lte: `${filter.year}-12-31` } } : {}),
-      ...(filter.status ? { status: filter.status } : {}),
+      ...statusWhere(filter.status),
       ...(filter.customerId ? { customerId: filter.customerId } : {}),
     },
     orderBy: [{ issueDate: "desc" }, { createdAt: "desc" }],
-    include: { customer: { select: { id: true, name: true } } },
+    include: { customer: { select: { id: true, name: true } }, ...SENT_EMAILS_COUNT },
   });
 }

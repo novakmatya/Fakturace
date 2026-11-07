@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Badge, ButtonLink, Card, CardTitle, PageHeader } from "@/components/ui";
+import { Alert, Badge, ButtonLink, Card, CardTitle, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatCzDate, todayPrague, yearOf } from "@/lib/dates";
-import { invoiceStatusBadge } from "@/lib/invoices/display";
+import { failedEmailCount } from "@/lib/email/outbox";
+import { invoiceStatusBadge, SENT_EMAILS_COUNT } from "@/lib/invoices/display";
 import { formatCzk } from "@/lib/money";
+import { czPlural } from "@/lib/text";
 import { requireUser } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Přehled" };
@@ -15,7 +17,7 @@ export default async function DashboardPage() {
   const from = `${year}-01-01`;
   const to = `${year}-12-31`;
 
-  const [supplier, sourceCount, customerCount, issued, drafts, recent] = await Promise.all([
+  const [supplier, sourceCount, customerCount, issued, drafts, recent, unsent, failedEmails] = await Promise.all([
     prisma.supplierProfile.findUnique({ where: { id: 1 }, select: { id: true } }),
     prisma.incomeSource.count({ where: { archived: false } }),
     prisma.customer.count({ where: { archived: false } }),
@@ -28,8 +30,12 @@ export default async function DashboardPage() {
     prisma.invoice.findMany({
       orderBy: [{ updatedAt: "desc" }],
       take: 6,
-      include: { customer: { select: { name: true } } },
+      include: { customer: { select: { name: true } }, ...SENT_EMAILS_COUNT },
     }),
+    prisma.invoice.count({
+      where: { type: "FAKTURA", status: "VYSTAVENA", emails: { none: { kind: "INVOICE", status: "SENT" } } },
+    }),
+    failedEmailCount(14),
   ]);
 
   const steps = [
@@ -49,16 +55,35 @@ export default async function DashboardPage() {
         actions={<ButtonLink href="/faktury/nova">Nová faktura</ButtonLink>}
       />
 
+      {failedEmails > 0 ? (
+        <div className="mb-6">
+          <Alert tone="danger">
+            {failedEmails} {czPlural(failedEmails, "e-mail se", "e-maily se", "e-mailů se")} za posledních 14 dní
+            nepodařilo odeslat. Důvod a nové odeslání najdete v detailu faktury v sekci E-maily.
+          </Alert>
+        </div>
+      ) : null}
+
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Card>
           <p className="label-caps">Vystaveno {year}</p>
           <p className="tabular mt-2 text-2xl font-semibold tracking-tight">{formatCzk(issued._sum.amountDueHalere ?? 0)}</p>
-          <p className="mt-1 text-sm text-muted">{issued._count} faktur podle data vystavení</p>
+          <p className="mt-1 text-sm text-muted">{issued._count} {czPlural(issued._count, "faktura", "faktury", "faktur")} podle data vystavení</p>
         </Card>
         <Card>
-          <p className="label-caps">Koncepty</p>
+          <p className="label-caps">Rozpracované</p>
           <p className="tabular mt-2 text-2xl font-semibold tracking-tight">{drafts}</p>
-          <p className="mt-1 text-sm text-muted">čekají na vystavení</p>
+          <p className="mt-1 text-sm text-muted">
+            {czPlural(drafts, "koncept čeká", "koncepty čekají", "konceptů čeká")} na vystavení
+            {unsent > 0 ? (
+              <>
+                {" · "}
+                <Link href="/faktury?stav=NEODESLANA" className="text-accent underline-offset-4 hover:underline">
+                  {unsent} {czPlural(unsent, "faktura", "faktury", "faktur")} k odeslání
+                </Link>
+              </>
+            ) : null}
+          </p>
         </Card>
         <Card>
           <p className="label-caps">Příjmy podle úhrad</p>

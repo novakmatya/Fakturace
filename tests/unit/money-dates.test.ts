@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { addDays, daysBetween, formatCzDate, isIsoDate, pragueDateOf, todayPrague } from "@/lib/dates";
+import { addDays, daysBetween, formatCzDate, formatCzDateTime, isIsoDate, pragueDateOf, todayPrague } from "@/lib/dates";
+import { parseAddressList, parseMailbox } from "@/lib/email/address";
+import { czPlural } from "@/lib/text";
 import {
   formatCzk,
   formatQuantity,
@@ -79,5 +81,39 @@ describe("kalendářní data v Europe/Prague", () => {
     expect(daysBetween("2026-12-15", "2027-01-10")).toBe(26);
     expect(isIsoDate("2026-02-30")).toBe(false);
     expect(formatCzDate("2026-11-06")).toBe("6. 11. 2026");
+  });
+});
+
+describe("formátování a adresy", () => {
+  it("datum a čas v pražském čase bez úvodních nul", () => {
+    expect(formatCzDateTime(new Date("2026-11-07T06:05:00Z"))).toBe("7.\u00a011.\u00a02026 7:05");
+    expect(formatCzDateTime(new Date("2026-07-31T22:30:00Z"))).toBe("1.\u00a08.\u00a02026 0:30"); // letní čas
+  });
+
+  it("český plurál", () => {
+    expect([0, 1, 2, 4, 5, 11].map((n) => czPlural(n, "faktura", "faktury", "faktur"))).toEqual([
+      "faktur",
+      "faktura",
+      "faktury",
+      "faktury",
+      "faktur",
+      "faktur",
+    ]);
+  });
+
+  it("seznam e-mailových adres", () => {
+    expect(parseAddressList("a@example.cz, B@example.cz; a@example.cz")).toEqual({
+      ok: true,
+      addresses: ["a@example.cz", "B@example.cz"],
+    });
+    expect(parseAddressList("", { required: true }).ok).toBe(false);
+    expect(parseAddressList("a@example.cz, nic")).toEqual({ ok: false, error: "Neplatná adresa: nic" });
+  });
+
+  it("odesílatel s jménem i bez", () => {
+    expect(parseMailbox("Jan Novák <faktury@example.cz>")).toEqual({ name: "Jan Novák", address: "faktury@example.cz" });
+    expect(parseMailbox('"Novák, advokát" <a@example.cz>')).toEqual({ name: "Novák, advokát", address: "a@example.cz" });
+    expect(parseMailbox("faktury@example.cz")).toEqual({ name: null, address: "faktury@example.cz" });
+    expect(parseMailbox("Jan Novák")).toBeNull();
   });
 });

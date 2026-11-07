@@ -78,10 +78,22 @@ export function runMigrations({ dbPath, migrationsDir, log = () => {} }) {
         ).run(crypto.randomUUID(), checksum, Date.now(), name, startedAt);
       };
 
-      // Migrace, které přestavují tabulky, si cizí klíče vypínají samy (PRAGMA
-      // nefunguje uvnitř transakce) – ty se spouštějí bez obalující transakce.
+      // Migrace, které přestavují tabulky, vypínají cizí klíče. PRAGMA uvnitř
+      // transakce nefunguje, proto se vypnou před ní, migrace proběhne celá
+      // v transakci (buď celá, nebo vůbec) a před potvrzením se ověří integrita.
       if (/PRAGMA\s+foreign_keys\s*=\s*OFF/i.test(sql)) {
-        apply();
+        db.pragma("foreign_keys = OFF");
+        try {
+          db.transaction(() => {
+            apply();
+            const violations = db.pragma("foreign_key_check");
+            if (violations.length > 0) {
+              throw new Error(`Migrace ${name} porušuje cizí klíče: ${JSON.stringify(violations.slice(0, 5))}`);
+            }
+          })();
+        } finally {
+          db.pragma("foreign_keys = ON");
+        }
       } else {
         db.transaction(apply)();
       }

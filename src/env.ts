@@ -15,6 +15,14 @@ const schema = z.object({
   ARES_BASE_URL: z
     .url()
     .default("https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty"),
+  // E-maily jdou přes HTTPS (Railway Hobby odchozí SMTP blokuje):
+  // a) Gmail – webová aplikace Google Apps Script ve vašem účtu (bez vlastní domény),
+  // b) Resend – HTTPS API, vyžaduje ověřenou vlastní doménu.
+  GMAIL_RELAY_URL: z.url().optional(),
+  GMAIL_RELAY_SECRET: z.string().optional(),
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_API_URL: z.url().default("https://api.resend.com"),
+  MAIL_FROM: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

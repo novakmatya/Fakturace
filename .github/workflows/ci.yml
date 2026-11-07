@@ -59,13 +59,19 @@ jobs:
         env:
           E2E_BASE_URL: http://localhost:3300
           E2E_SETUP_TOKEN: ci-setup-token-0123456789
+          E2E_GMAIL_SECRET: ci-gmail-secret-0123456789-abcdef
         run: |
           mkdir -p "$RUNNER_TEMP/data"
+          # e-maily jdou do napodobeniny Gmail skriptu, kterou spouští Playwright na hostiteli
           docker run -d --name fakturace -p 3300:3000 \
+            --add-host=host.docker.internal:host-gateway \
             -v "$RUNNER_TEMP/data:/data" \
             -e APP_URL=http://localhost:3300 \
             -e BETTER_AUTH_SECRET=ci-secret-0123456789-ci-secret-0123456789 \
             -e SETUP_TOKEN="$E2E_SETUP_TOKEN" \
+            -e GMAIL_RELAY_URL=http://host.docker.internal:3101/gmail/exec \
+            -e GMAIL_RELAY_SECRET="$E2E_GMAIL_SECRET" \
+            -e MAIL_FROM="Jan Novák <jan.novak@gmail.com>" \
             fakturace:ci
           for i in $(seq 1 60); do
             curl -fsS http://localhost:3300/api/zdravi && break

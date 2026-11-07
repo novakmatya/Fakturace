@@ -23,7 +23,13 @@ export type InvoiceFormDefaults = {
   lines: Omit<LineValue, "key">[];
 };
 
-type CustomerOption = { id: string; name: string; defaultIncomeSourceId: string | null; defaultDueDays: number | null };
+type CustomerOption = {
+  id: string;
+  name: string;
+  defaultIncomeSourceId: string | null;
+  defaultDueDays: number | null;
+  email: string | null;
+};
 type SourceOption = { id: string; name: string; section: string };
 
 let keyCounter = 0;
@@ -38,6 +44,8 @@ export function InvoiceForm({
   supplierDueDays,
   roundTotals,
   canIssue,
+  emailEnabled,
+  autoSendDefault,
 }: {
   invoiceId?: string;
   defaults: InvoiceFormDefaults;
@@ -46,6 +54,8 @@ export function InvoiceForm({
   supplierDueDays: number;
   roundTotals: boolean;
   canIssue: boolean;
+  emailEnabled: boolean;
+  autoSendDefault: boolean;
 }) {
   const [state, action] = useActionState<DraftFormState | null, FormData>(saveDraftAction, null);
   const [form, setForm] = useState(() => ({ ...defaults, lines: undefined }));
@@ -53,6 +63,7 @@ export function InvoiceForm({
     defaults.lines.length ? defaults.lines.map((l) => ({ ...l, key: newKey() })) : [emptyLine()],
   );
   const dueTouched = useRef(Boolean(invoiceId));
+  const [sendAfterIssue, setSendAfterIssue] = useState(autoSendDefault);
   const errors = state && !state.ok ? (state.fieldErrors ?? {}) : {};
 
   const set = (name: keyof InvoiceFormDefaults, value: string) => setForm((f) => ({ ...f, [name]: value }));
@@ -91,6 +102,9 @@ export function InvoiceForm({
   }, [lines, roundTotals]);
 
   const selectedSource = incomeSources.find((s) => s.id === form.incomeSourceId);
+  const customerEmail = customers.find((c) => c.id === form.customerId)?.email ?? null;
+  const canSend = emailEnabled && Boolean(customerEmail);
+  const willSend = canSend && sendAfterIssue;
   const payload = JSON.stringify({
     ...form,
     lines: lines.map((l) => ({ description: l.description, quantity: l.quantity, unit: l.unit, unitPrice: l.unitPrice, kind: l.kind })),
@@ -299,14 +313,39 @@ export function InvoiceForm({
               className="w-full"
               disabled={!canIssue}
               onClick={(e) => {
-                if (!confirm("Po vystavení už fakturu nelze upravit ani smazat – opravit ji půjde jen dobropisem. Vystavit?")) {
+                const sending = willSend ? ` Faktura se zároveň odešle e-mailem na ${customerEmail}.` : "";
+                if (
+                  !confirm(
+                    `Po vystavení už fakturu nelze upravit ani smazat – opravit ji půjde jen dobropisem.${sending} Vystavit?`,
+                  )
+                ) {
                   e.preventDefault();
                 }
               }}
             >
-              Uložit a vystavit
+              {willSend ? "Vystavit a odeslat" : "Uložit a vystavit"}
             </Button>
           </div>
+          <label className={cx("mt-4 flex items-start gap-2.5 text-sm", !canSend && "text-muted")}>
+            <input
+              type="checkbox"
+              name="sendAfterIssue"
+              className="mt-0.5 size-4 accent-[var(--color-accent)]"
+              checked={willSend}
+              disabled={!canSend}
+              onChange={(e) => setSendAfterIssue(e.target.checked)}
+            />
+            <span>
+              Po vystavení odeslat e-mailem
+              <span className="block text-[13px] text-muted">
+                {!emailEnabled
+                  ? "Odesílání e-mailů není nastavené."
+                  : customerEmail
+                    ? `na ${customerEmail} (s PDF v příloze)`
+                    : "Odběratel nemá vyplněný e-mail."}
+              </span>
+            </span>
+          </label>
           {!canIssue ? (
             <div className="mt-4">
               <Alert tone="warn">

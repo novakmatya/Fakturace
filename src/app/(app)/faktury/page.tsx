@@ -12,7 +12,9 @@ export const metadata: Metadata = { title: "Faktury" };
 const STATUSES = [
   { value: "", label: "Všechny stavy" },
   { value: "KONCEPT", label: "Koncepty" },
-  { value: "VYSTAVENA", label: "Vystavené" },
+  { value: "VYSTAVENA", label: "Vystavené (vše)" },
+  { value: "NEODESLANA", label: "Vystavené – neodeslané" },
+  { value: "ODESLANA", label: "Odeslané" },
   { value: "STORNOVANA", label: "Stornované" },
 ];
 

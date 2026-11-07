@@ -2,6 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { parseAddressList } from "@/lib/email/address";
+import { buildInvoiceEmailDraft, queueInvoiceEmail } from "@/lib/email/invoice-email";
+import { kickOutboxAfterResponse } from "@/lib/email/kick";
 import { userMessage } from "@/lib/errors";
 import { ensureInvoicePdf } from "@/lib/invoices/documents";
 import { draftSchema } from "@/lib/invoices/draft-schema";
@@ -31,12 +34,28 @@ export async function saveDraftAction(_prev: DraftFormState | null, formData: Fo
   }
   revalidatePath("/faktury");
   if (formData.get("intent") === "issue") {
-    return issueAndRedirect(savedId);
+    return issueAndRedirect(savedId, { send: formData.get("sendAfterIssue") === "on" });
   }
   redirect(`/faktury/${savedId}?ulozeno=1`);
 }
 
-async function issueAndRedirect(id: string): Promise<DraftFormState> {
+/** Zařadí e-mail s fakturou podle šablony na adresy z karty odběratele. */
+async function queueAutomaticEmail(id: string): Promise<boolean> {
+  try {
+    const draft = await buildInvoiceEmailDraft(id);
+    const to = parseAddressList(draft.to, { required: true });
+    const cc = parseAddressList(draft.cc);
+    if (!to.ok || !cc.ok) return false;
+    await queueInvoiceEmail(id, { to: to.addresses, cc: cc.addresses, subject: draft.subject, body: draft.body, auto: true });
+    kickOutboxAfterResponse();
+    return true;
+  } catch (error) {
+    console.error("Zařazení e-mailu po vystavení selhalo", error);
+    return false;
+  }
+}
+
+async function issueAndRedirect(id: string, options: { send?: boolean } = {}): Promise<DraftFormState> {
   try {
     await issueInvoice(id);
   } catch (error) {
@@ -44,14 +63,20 @@ async function issueAndRedirect(id: string): Promise<DraftFormState> {
     return { ok: false, error: userMessage(error) };
   }
   // PDF se vyrábí po potvrzení vystavení; když selže, detail nabídne nový pokus.
+  let pdfReady = false;
   try {
     await ensureInvoicePdf(id);
+    pdfReady = true;
   } catch (error) {
     console.error("Vytvoření PDF selhalo", error);
   }
+  let emailFlag = "";
+  if (options.send) {
+    emailFlag = pdfReady && (await queueAutomaticEmail(id)) ? "&email=fronta" : "&email=chyba";
+  }
   revalidatePath("/faktury");
   revalidatePath(`/faktury/${id}`);
-  redirect(`/faktury/${id}?vystaveno=1`);
+  redirect(`/faktury/${id}?vystaveno=1${emailFlag}`);
 }
 
 export async function issueInvoiceAction(_prev: DraftFormState | null, formData: FormData): Promise<DraftFormState> {

@@ -6,14 +6,21 @@ export async function getAppSettings() {
   return prisma.appSettings.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} });
 }
 
-export async function updateAppSettings(data: { roundInvoiceTotal: boolean }) {
+export type AppSettingsUpdate = Partial<{
+  roundInvoiceTotal: boolean;
+  emailAutoSendOnIssue: boolean;
+  emailBccSelf: boolean;
+}>;
+
+export async function updateAppSettings(data: AppSettingsUpdate) {
   const before = await getAppSettings();
   const after = await prisma.appSettings.update({ where: { id: 1 }, data });
+  const keys = Object.keys(data) as (keyof AppSettingsUpdate)[];
   await audit({
     action: "SETTINGS_UPDATED",
     entityType: "AppSettings",
     entityId: "1",
-    details: { before: { roundInvoiceTotal: before.roundInvoiceTotal }, after: data },
+    details: { before: Object.fromEntries(keys.map((k) => [k, before[k]])), after: data },
   });
   return after;
 }

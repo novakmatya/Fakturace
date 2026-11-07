@@ -18,8 +18,8 @@ Soukromá webová aplikace pro fakturaci a roční daňové podklady fyzické os
 | 1 | instalace účtu, přihlášení, 2FA, auditní log | hotovo |
 | 2 | dodavatel, činnosti (§ 7 / § 9), odběratelé + ARES | hotovo |
 | 3 | faktury: koncept → vystavení, číselná řada bez mezer, PDF + QR | hotovo |
-| 4 | odesílání e-mailem, šablony, log odeslání | další |
-| 5 | úhrady, stavy po splatnosti, upomínky | |
+| 4 | odesílání e-mailem (Gmail / Resend), šablona, fronta s opakováním, log | hotovo |
+| 5 | úhrady, stavy po splatnosti, upomínky | další |
 | 6 | dobropisy a storno | |
 | 7 | opakované faktury | |
 | 8 | výdaje a účtenky, archiv | |
@@ -46,7 +46,7 @@ služby nepodporuje).
    | `SETUP_TOKEN` | výstup `openssl rand -hex 16` |
 
    `DATA_DIR=/data` je nastavené v image. `APP_URL` musí přesně odpovídat adrese
-   v prohlížeči, jinak přihlášení odmítne požadavek.
+   v prohlížeči, jinak přihlášení odmítne požadavek. Proměnné pro e-maily viz níže.
 5. **Settings → Deploy → Healthcheck Path:** `/api/zdravi`.
 6. Otevřete adresu aplikace → průvodce **Instalace** → zadejte `SETUP_TOKEN`,
    založte účet → přihlaste se → nastavte dvoufázové ověření a uložte si záložní kódy.
@@ -59,6 +59,29 @@ Poznámky:
   připojený vždy jen jeden běžící kontejner).
 - Druhý účet založit nejde (hlídá to aplikace i databáze). `SETUP_TOKEN` můžete
   po instalaci změnit na jinou náhodnou hodnotu.
+
+## E-maily
+
+Railway na tarifu Hobby blokuje odchozí SMTP, proto aplikace posílá e-maily přes HTTPS:
+
+- **Gmail (doporučeno, bez vlastní domény).** Malý skript Google Apps Script ve vašem
+  Google účtu odešle e-mail z vašeho Gmailu (služba MailApp – skript smí jen odesílat,
+  poštu nečte). Odeslané faktury zůstávají ve složce Odeslané. Limit běžného účtu je
+  100 příjemců denně. Postup krok za krokem včetně skriptu s doplněným klíčem je
+  v aplikaci: **Nastavení → E-maily → Propojení Gmailu**. Proměnné:
+
+  | Proměnná | Hodnota |
+  |---|---|
+  | `GMAIL_RELAY_SECRET` | výstup `openssl rand -hex 24` (stejný klíč je ve skriptu) |
+  | `GMAIL_RELAY_URL` | adresa nasazené webové aplikace skriptu (končí `/exec`) |
+  | `MAIL_FROM` | `Jméno Příjmení <vas.ucet@gmail.com>` – Gmail, pod kterým skript běží |
+
+- **Resend (s vlastní doménou).** Nastavte `RESEND_API_KEY` a `MAIL_FROM` na adrese
+  ověřené domény. Použije se, jen když nejsou nastavené proměnné pro Gmail.
+
+E-maily jdou přes frontu: odeslání proběhne hned po vystavení (do několika sekund),
+dočasné chyby se opakují (za 1, 5, 15 a 60 minut), každý pokus má stejný klíč
+idempotence, takže nevznikne duplikát. Log odeslaných e-mailů je v databázi neměnný.
 
 ## Lokální vývoj
 

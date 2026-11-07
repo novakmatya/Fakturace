@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { Alert, Badge, ButtonLink, Card, CardTitle, DefinitionList, PageHeader } from "@/components/ui";
 import { formatIban } from "@/lib/bank";
 import { formatCzDate } from "@/lib/dates";
+import { emailConfig } from "@/lib/email/config";
+import { listEmailsForInvoice } from "@/lib/email/outbox";
 import { invoiceStatusBadge } from "@/lib/invoices/display";
 import { getInvoice } from "@/lib/invoices/service";
 import { type CustomerSnapshot, PAYMENT_METHOD_LABEL, type PaymentMethod, type SupplierSnapshot } from "@/lib/invoices/types";
@@ -12,6 +14,7 @@ import { requireUser } from "@/lib/session";
 import { deleteDraftAction, regeneratePdfAction } from "../actions";
 import { loadInvoiceFormContext } from "../form-data";
 import { InvoiceForm } from "../invoice-form";
+import { EmailLog } from "./email-log";
 
 export const metadata: Metadata = { title: "Doklad" };
 
@@ -89,6 +92,9 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
   const customer = JSON.parse(invoice.customerSnapshot ?? "{}") as CustomerSnapshot;
   const badge = invoiceStatusBadge(invoice);
   const title = invoice.type === "DOBROPIS" ? "Dobropis" : "Faktura";
+  const emails = await listEmailsForInvoice(invoice.id);
+  const canSend = invoice.type === "FAKTURA" && invoice.status === "VYSTAVENA" && emailConfig().mode !== "off";
+  const alreadySent = emails.some((e) => e.status === "SENT");
 
   return (
     <>
@@ -102,22 +108,40 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
         }
         description={`${customer.name} · splatnost ${formatCzDate(invoice.dueDate)}`}
         actions={
-          invoice.pdfFile ? (
-            <>
-              <ButtonLink href={`/api/soubory/${invoice.pdfFile.id}`} target="_blank" variant="secondary">
-                Otevřít PDF
+          <>
+            {invoice.pdfFile ? (
+              <>
+                <ButtonLink href={`/api/soubory/${invoice.pdfFile.id}`} target="_blank" variant="secondary">
+                  Otevřít PDF
+                </ButtonLink>
+                <ButtonLink href={`/api/soubory/${invoice.pdfFile.id}?stahnout=1`} variant="secondary">
+                  Stáhnout PDF
+                </ButtonLink>
+              </>
+            ) : null}
+            {canSend ? (
+              <ButtonLink href={`/faktury/${invoice.id}/odeslat`} variant={alreadySent ? "secondary" : "primary"}>
+                {alreadySent ? "Odeslat znovu" : "Odeslat e-mailem"}
               </ButtonLink>
-              <ButtonLink href={`/api/soubory/${invoice.pdfFile.id}?stahnout=1`}>Stáhnout PDF</ButtonLink>
-            </>
-          ) : null
+            ) : null}
+          </>
         }
       />
 
       <div className="mb-6 space-y-3">
         {query.vystaveno ? (
           <Alert tone="ok" title={`Faktura ${invoice.number} je vystavená.`}>
-            Číslo je přidělené, údaje zmrazené{invoice.pdfFile ? " a PDF s QR platbou uložené" : ""}. Odeslání e-mailem
-            přibude v dalším kroku.
+            Číslo je přidělené, údaje zmrazené{invoice.pdfFile ? " a PDF s QR platbou uložené" : ""}.
+            {query.email === "fronta" ? " E-mail s fakturou se odesílá – stav vidíte níže v sekci E-maily." : ""}
+          </Alert>
+        ) : null}
+        {!query.vystaveno && query.email === "fronta" ? (
+          <Alert tone="ok">E-mail s fakturou se odesílá – stav vidíte níže v sekci E-maily.</Alert>
+        ) : null}
+        {query.email === "chyba" ? (
+          <Alert tone="warn" title="E-mail se nepodařilo připravit.">
+            Faktura je vystavená, ale e-mail se nezařadil k odeslání (zkontrolujte e-mail odběratele a nastavení e-mailů).
+            Odeslat ji můžete tlačítkem Odeslat e-mailem.
           </Alert>
         ) : null}
         {!invoice.pdfFile ? (
@@ -133,50 +157,53 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <Card>
-          <div className="grid gap-6 sm:grid-cols-2">
-            <Party label="Dodavatel" party={supplier} />
-            <Party label="Odběratel" party={customer} />
-          </div>
-          <div className="mt-6 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-ink/80 text-left">
-                <tr>
-                  <th className="label-caps py-2 pr-3">Popis</th>
-                  <th className="label-caps py-2 pr-3 text-right">Množství</th>
-                  <th className="label-caps py-2 pr-3 text-right">Jedn. cena</th>
-                  <th className="label-caps py-2 text-right">Celkem</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {invoice.lines.map((line) => (
-                  <tr key={line.id}>
-                    <td className="py-2.5 pr-3">{line.description}</td>
-                    <td className="tabular py-2.5 pr-3 text-right">
-                      {formatQuantity(line.quantityMilli)} {line.unit}
-                    </td>
-                    <td className="tabular py-2.5 pr-3 text-right">{formatCzk(line.unitPriceHalere)}</td>
-                    <td className="tabular py-2.5 text-right">{formatCzk(line.totalHalere)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-5 ml-auto max-w-xs space-y-1 text-sm">
-            {invoice.roundingHalere !== 0 ? (
-              <div className="flex justify-between text-muted">
-                <span>Zaokrouhlení</span>
-                <span className="tabular">{formatCzk(invoice.roundingHalere)}</span>
-              </div>
-            ) : null}
-            <div className="flex items-baseline justify-between border-t border-line pt-2">
-              <span className="font-medium">Celkem k úhradě</span>
-              <span className="tabular text-xl font-semibold text-accent">{formatCzk(invoice.amountDueHalere)}</span>
+        <div className="min-w-0 space-y-6">
+          <Card>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <Party label="Dodavatel" party={supplier} />
+              <Party label="Odběratel" party={customer} />
             </div>
-            <p className="text-right text-[13px] text-muted">{supplier.vatNote}</p>
-          </div>
-          {invoice.note ? <p className="mt-6 text-sm text-muted">{invoice.note}</p> : null}
-        </Card>
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-ink/80 text-left">
+                  <tr>
+                    <th className="label-caps py-2 pr-3">Popis</th>
+                    <th className="label-caps py-2 pr-3 text-right">Množství</th>
+                    <th className="label-caps py-2 pr-3 text-right">Jedn. cena</th>
+                    <th className="label-caps py-2 text-right">Celkem</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {invoice.lines.map((line) => (
+                    <tr key={line.id}>
+                      <td className="py-2.5 pr-3">{line.description}</td>
+                      <td className="tabular py-2.5 pr-3 text-right">
+                        {formatQuantity(line.quantityMilli)} {line.unit}
+                      </td>
+                      <td className="tabular py-2.5 pr-3 text-right">{formatCzk(line.unitPriceHalere)}</td>
+                      <td className="tabular py-2.5 text-right">{formatCzk(line.totalHalere)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-5 ml-auto max-w-xs space-y-1 text-sm">
+              {invoice.roundingHalere !== 0 ? (
+                <div className="flex justify-between text-muted">
+                  <span>Zaokrouhlení</span>
+                  <span className="tabular">{formatCzk(invoice.roundingHalere)}</span>
+                </div>
+              ) : null}
+              <div className="flex items-baseline justify-between border-t border-line pt-2">
+                <span className="font-medium">Celkem k úhradě</span>
+                <span className="tabular text-xl font-semibold text-accent">{formatCzk(invoice.amountDueHalere)}</span>
+              </div>
+              <p className="text-right text-[13px] text-muted">{supplier.vatNote}</p>
+            </div>
+            {invoice.note ? <p className="mt-6 text-sm text-muted">{invoice.note}</p> : null}
+          </Card>
+          {invoice.type === "FAKTURA" ? <EmailLog invoiceId={invoice.id} emails={emails} canSend={canSend} /> : null}
+        </div>
 
         <div className="space-y-6">
           <Card>

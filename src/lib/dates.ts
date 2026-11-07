@@ -66,3 +66,20 @@ export function compactDate(value: string): string {
   parse(value);
   return value.replaceAll("-", "");
 }
+
+const dateTimeParts = new Intl.DateTimeFormat("en-GB", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** Okamžik → "7. 11. 2026 14:03" v pražském čase. */
+export function formatCzDateTime(instant: Date): string {
+  const parts = Object.fromEntries(dateTimeParts.formatToParts(instant).map((p) => [p.type, p.value]));
+  const nbsp = "\u00a0";
+  return `${Number(parts.day)}.${nbsp}${Number(parts.month)}.${nbsp}${parts.year} ${Number(parts.hour)}:${parts.minute}`;
+}

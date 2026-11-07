@@ -84,8 +84,11 @@ test("od instalace k vystavené faktuře s PDF", async ({ page }) => {
   await page.getByLabel("Jednotka").fill("hod");
   await page.getByLabel("Cena za jednotku").fill("1 500");
   await expect(page.getByText("3 000,00 Kč").first()).toBeVisible();
+  // Odběratel má e-mail, odesílání je zapnuté → výchozí volba je vystavit a rovnou odeslat.
+  await expect(page.getByLabel(/Po vystavení odeslat e-mailem/)).toBeChecked();
   await page.screenshot({ path: path.join(shots, "05-nova-faktura.png"), fullPage: true });
-  await page.getByRole("button", { name: "Uložit a vystavit" }).click();
+  const issuedAt = Date.now();
+  await page.getByRole("button", { name: "Vystavit a odeslat" }).click();
 
   await expect(page.getByText(/Faktura \d{8} je vystavená/)).toBeVisible();
   const heading = await page.getByRole("heading", { level: 1 }).textContent();
@@ -94,7 +97,33 @@ test("od instalace k vystavené faktuře s PDF", async ({ page }) => {
   expect(number).toBe(`${pragueYear}0001`);
   await page.screenshot({ path: path.join(shots, "06-faktura.png"), fullPage: true });
 
-  // 8) PDF je dostupné jen přihlášenému
+  // 8) Akceptační kritérium: e-mail s PDF odejde do 1 minuty od vystavení
+  await expect(page.getByText("Odesláno", { exact: true })).toBeVisible({ timeout: 60_000 });
+  expect(Date.now() - issuedAt).toBeLessThan(60_000);
+  await expect(page.getByText("Odeslána", { exact: true })).toBeVisible();
+  const mockUrl = process.env.E2E_MOCK_EMAIL_URL ?? "http://127.0.0.1:3101";
+  const mailboxContext = await request.newContext();
+  const messages = (await (await mailboxContext.get(`${mockUrl}/__messages`)).json()) as {
+    channel: string;
+    body: { to: string[]; subject: string; fromName: string; attachment: { filename: string; content: string } };
+  }[];
+  await mailboxContext.dispose();
+  const mail = messages.find((m) => m.body.subject.includes(number!));
+  expect(mail, "e-mail s fakturou dorazil do (napodobeného) Gmail skriptu").toBeTruthy();
+  expect(mail!.channel).toBe("gmail");
+  expect(mail!.body.fromName).toBe("Jan Novák");
+  expect(mail!.body.to).toEqual(["fakturace@example.cz"]);
+  expect(mail!.body.attachment.filename).toBe(`Faktura-${number}.pdf`);
+  expect(Buffer.from(mail!.body.attachment.content, "base64").subarray(0, 5).toString()).toBe("%PDF-");
+  await page.screenshot({ path: path.join(shots, "07-odeslano.png"), fullPage: true });
+  const invoiceUrl = page.url();
+
+  await page.goto("/nastaveni/emaily");
+  await expect(page.getByRole("heading", { name: "E-maily", level: 1 })).toBeVisible();
+  await page.screenshot({ path: path.join(shots, "08-nastaveni-emaily.png"), fullPage: true });
+  await page.goto(invoiceUrl);
+
+  // 9) PDF je dostupné jen přihlášenému
   const href = await page.getByRole("link", { name: "Stáhnout PDF" }).getAttribute("href");
   const pdf = await page.request.get(href!);
   expect(pdf.status()).toBe(200);
