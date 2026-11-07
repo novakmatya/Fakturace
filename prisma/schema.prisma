@@ -24,6 +24,14 @@ model AppSettings {
   emailAutoSendOnIssue Boolean  @default(true)
   /// Posílat skrytou kopii každého e-mailu na e-mail dodavatele.
   emailBccSelf         Boolean  @default(true)
+  /// Automatické upomínky neuhrazených faktur (výchozí vypnuto).
+  remindersAuto        Boolean  @default(false)
+  /// První upomínka X dní po splatnosti.
+  reminderFirstDays    Int      @default(7)
+  /// Další upomínky po Y dnech (0 = jen jedna).
+  reminderRepeatDays   Int      @default(14)
+  /// Nejvýše N upomínek k jedné faktuře.
+  reminderMaxCount     Int      @default(3)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 }
@@ -160,6 +168,7 @@ model Invoice {
   recurringPlan     RecurringPlan? @relation(fields: [recurringPlanId], references: [id])
   pdfFile           FileObject?    @relation(fields: [pdfFileId], references: [id])
   emails            EmailMessage[]
+  payments          Payment[]
 
   @@unique([type, number])
   @@unique([recurringPlanId, periodKey])
@@ -194,6 +203,30 @@ model FileObject {
   createdAt    DateTime       @default(now())
   invoice      Invoice?
   emails       EmailMessage[]
+}
+
+// ---------------------------------------------------------------------------
+// Úhrady
+// ---------------------------------------------------------------------------
+
+/// Úhrada faktury. Rozhoduje o zdanění (peněžní princip: rok data úhrady).
+/// Záznam je neměnný a nemazatelný; chybný se stornuje s důvodem (hlídají triggery).
+model Payment {
+  id            String    @id @default(cuid())
+  invoiceId     String
+  paidOn        String
+  amountHalere  Int
+  method        String    @default("PREVOD")
+  source        String    @default("MANUAL")
+  note          String?
+  bankReference String?
+  createdAt     DateTime  @default(now())
+  cancelledAt   DateTime?
+  cancelReason  String?
+  invoice       Invoice   @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+  @@index([paidOn])
 }
 
 // ---------------------------------------------------------------------------
@@ -232,6 +265,8 @@ model EmailMessage {
   providerMessageId String?
   queuedAt          DateTime    @default(now())
   sentAt            DateTime?
+  /// Zabraňuje duplicitám automatických e-mailů (např. „upominka:<faktura>:<pořadí>“).
+  dedupeKey         String?     @unique
   invoice           Invoice?    @relation(fields: [invoiceId], references: [id])
   attachment        FileObject? @relation(fields: [attachmentFileId], references: [id])
 

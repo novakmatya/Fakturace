@@ -7,6 +7,7 @@ import { AutoRefresh } from "@/components/auto-refresh";
 
 type EmailRow = {
   id: string;
+  kind: string;
   status: string;
   auto: boolean;
   toAddresses: string;
@@ -56,6 +57,7 @@ export function EmailLog({ invoiceId, emails, canSend }: { invoiceId: string; em
                   <span className="tabular text-muted">
                     {email.sentAt ? formatCzDateTime(email.sentAt) : formatCzDateTime(email.queuedAt)}
                   </span>
+                  {email.kind === "REMINDER" ? <span className="text-[13px] font-medium text-danger">Upomínka</span> : null}
                   <span className="min-w-0 flex-1 truncate">{recipients.join(", ")}</span>
                   {email.auto ? <span className="text-[13px] text-muted">automaticky</span> : null}
                 </div>

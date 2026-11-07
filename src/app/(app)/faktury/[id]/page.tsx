@@ -3,10 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Alert, Badge, ButtonLink, Card, CardTitle, DefinitionList, PageHeader } from "@/components/ui";
 import { formatIban } from "@/lib/bank";
-import { formatCzDate } from "@/lib/dates";
+import { formatCzDate, todayPrague } from "@/lib/dates";
 import { emailConfig } from "@/lib/email/config";
 import { listEmailsForInvoice } from "@/lib/email/outbox";
-import { invoiceStatusBadge } from "@/lib/invoices/display";
+import { listPayments } from "@/lib/payments/service";
+import { displayStatus, statusBadge } from "@/lib/invoices/display";
 import { getInvoice } from "@/lib/invoices/service";
 import { type CustomerSnapshot, PAYMENT_METHOD_LABEL, type PaymentMethod, type SupplierSnapshot } from "@/lib/invoices/types";
 import { formatCzk, formatQuantity } from "@/lib/money";
@@ -15,6 +16,7 @@ import { deleteDraftAction, regeneratePdfAction } from "../actions";
 import { loadInvoiceFormContext } from "../form-data";
 import { InvoiceForm } from "../invoice-form";
 import { EmailLog } from "./email-log";
+import { PaymentsCard } from "./payments-card";
 
 export const metadata: Metadata = { title: "Doklad" };
 
@@ -90,11 +92,13 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
 
   const supplier = JSON.parse(invoice.supplierSnapshot ?? "{}") as SupplierSnapshot;
   const customer = JSON.parse(invoice.customerSnapshot ?? "{}") as CustomerSnapshot;
-  const badge = invoiceStatusBadge(invoice);
+  const today = todayPrague();
+  const status = displayStatus(invoice, today);
+  const badge = statusBadge(status);
   const title = invoice.type === "DOBROPIS" ? "Dobropis" : "Faktura";
-  const emails = await listEmailsForInvoice(invoice.id);
+  const [emails, payments] = await Promise.all([listEmailsForInvoice(invoice.id), listPayments(invoice.id)]);
   const canSend = invoice.type === "FAKTURA" && invoice.status === "VYSTAVENA" && emailConfig().mode !== "off";
-  const alreadySent = emails.some((e) => e.status === "SENT");
+  const alreadySent = emails.some((e) => e.status === "SENT" && e.kind === "INVOICE");
 
   return (
     <>
@@ -119,7 +123,10 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
                 </ButtonLink>
               </>
             ) : null}
-            {canSend ? (
+            {canSend && status === "PO_SPLATNOSTI" ? (
+              <ButtonLink href={`/faktury/${invoice.id}/odeslat?typ=upominka`}>Poslat upomínku</ButtonLink>
+            ) : null}
+            {canSend && status !== "UHRAZENA" && status !== "PO_SPLATNOSTI" ? (
               <ButtonLink href={`/faktury/${invoice.id}/odeslat`} variant={alreadySent ? "secondary" : "primary"}>
                 {alreadySent ? "Odeslat znovu" : "Odeslat e-mailem"}
               </ButtonLink>
@@ -135,6 +142,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
             {query.email === "fronta" ? " E-mail s fakturou se odesílá – stav vidíte níže v sekci E-maily." : ""}
           </Alert>
         ) : null}
+        {query.uhrazeno ? <Alert tone="ok">Úhrada je zapsaná – faktura je uhrazená.</Alert> : null}
         {!query.vystaveno && query.email === "fronta" ? (
           <Alert tone="ok">E-mail s fakturou se odesílá – stav vidíte níže v sekci E-maily.</Alert>
         ) : null}
@@ -202,6 +210,14 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
             </div>
             {invoice.note ? <p className="mt-6 text-sm text-muted">{invoice.note}</p> : null}
           </Card>
+          {invoice.type === "FAKTURA" ? (
+            <PaymentsCard
+              invoice={invoice}
+              payments={payments}
+              today={today}
+              canRecord={invoice.status === "VYSTAVENA"}
+            />
+          ) : null}
           {invoice.type === "FAKTURA" ? <EmailLog invoiceId={invoice.id} emails={emails} canSend={canSend} /> : null}
         </div>
 

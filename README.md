@@ -19,8 +19,8 @@ Soukromá webová aplikace pro fakturaci a roční daňové podklady fyzické os
 | 2 | dodavatel, činnosti (§ 7 / § 9), odběratelé + ARES | hotovo |
 | 3 | faktury: koncept → vystavení, číselná řada bez mezer, PDF + QR | hotovo |
 | 4 | odesílání e-mailem (Gmail / Resend), šablona, fronta s opakováním, log | hotovo |
-| 5 | úhrady, stavy po splatnosti, upomínky | další |
-| 6 | dobropisy a storno | |
+| 5 | úhrady (neměnné, storno s důvodem), stavy uhrazena / po splatnosti, upomínky | hotovo |
+| 6 | dobropisy a storno | další |
 | 7 | opakované faktury | |
 | 8 | výdaje a účtenky, archiv | |
 | 9 | import výpisu (CSV) a párování podle VS | |
@@ -78,6 +78,11 @@ Railway na tarifu Hobby blokuje odchozí SMTP, proto aplikace posílá e-maily p
 
 - **Resend (s vlastní doménou).** Nastavte `RESEND_API_KEY` a `MAIL_FROM` na adrese
   ověřené domény. Použije se, jen když nejsou nastavené proměnné pro Gmail.
+
+Upomínky: automatické jsou ve výchozím stavu vypnuté. Po zapnutí (Nastavení → E-maily)
+odchází první X dní po splatnosti, další po Y dnech, nejvýše N k faktuře – jen
+v pracovní dny 8–18 h a jen odběratelům se zapnutými upomínkami. Ručně se upomínka
+posílá z detailu faktury po splatnosti.
 
 E-maily jdou přes frontu: odeslání proběhne hned po vystavení (do několika sekund),
 dočasné chyby se opakují (za 1, 5, 15 a 60 minut), každý pokus má stejný klíč

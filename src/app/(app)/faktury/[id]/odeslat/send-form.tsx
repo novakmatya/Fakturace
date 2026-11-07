@@ -5,7 +5,15 @@ import { useActionState } from "react";
 import { FormMessage, SubmitButton, TextAreaField, TextField } from "@/components/form-controls";
 import { sendInvoiceEmailAction, type SendFormState, type SendFormValues } from "../../email-actions";
 
-export function SendInvoiceForm({ invoiceId, defaults }: { invoiceId: string; defaults: SendFormValues }) {
+export function SendInvoiceForm({
+  invoiceId,
+  kind,
+  defaults,
+}: {
+  invoiceId: string;
+  kind: "INVOICE" | "REMINDER";
+  defaults: SendFormValues;
+}) {
   const [state, action] = useActionState<SendFormState | null, FormData>(sendInvoiceEmailAction, null);
   const values = state && !state.ok && state.values ? state.values : defaults;
   const errors = state && !state.ok ? state.fieldErrors : undefined;
@@ -15,6 +23,7 @@ export function SendInvoiceForm({ invoiceId, defaults }: { invoiceId: string; de
   return (
     <form action={action} className="space-y-5" key={formKey}>
       <input type="hidden" name="invoiceId" value={invoiceId} />
+      <input type="hidden" name="kind" value={kind} />
       <FormMessage state={state} />
       <TextField
         name="to"
@@ -32,7 +41,7 @@ export function SendInvoiceForm({ invoiceId, defaults }: { invoiceId: string; de
         <Link href={`/faktury/${invoiceId}`} className="text-sm text-muted hover:text-ink">
           Zpět na fakturu
         </Link>
-        <SubmitButton pendingText="Odesílám…">Odeslat</SubmitButton>
+        <SubmitButton pendingText="Odesílám…">{kind === "REMINDER" ? "Odeslat upomínku" : "Odeslat"}</SubmitButton>
       </div>
     </form>
   );

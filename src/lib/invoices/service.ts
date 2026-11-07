@@ -1,7 +1,7 @@
 import { audit } from "@/lib/audit";
 import { todayPrague, yearOf } from "@/lib/dates";
 import { prisma, type Tx } from "@/lib/db";
-import { SENT_EMAILS_COUNT } from "@/lib/invoices/display";
+import { displayStatus, type DisplayStatus, STATUS_INCLUDE } from "@/lib/invoices/display";
 import type { DraftData } from "@/lib/invoices/draft-schema";
 import { allocateNumber } from "@/lib/invoices/numbering";
 import type { CustomerSnapshot, DocType, SupplierSnapshot } from "@/lib/invoices/types";
@@ -250,35 +250,55 @@ export async function getInvoice(id: string) {
       correctsInvoice: { select: { id: true, number: true } },
       creditNotes: { select: { id: true, number: true, status: true } },
       pdfFile: true,
-      ...SENT_EMAILS_COUNT,
+      ...STATUS_INCLUDE,
     },
   });
 }
 
-/** Filtr stavu: uložené stavy + odvozené ODESLANA / NEODESLANA (podle logu e-mailů). */
-function statusWhere(status: string | undefined) {
-  const sent = { some: { kind: "INVOICE", status: "SENT" } };
-  switch (status) {
-    case undefined:
-    case "":
-      return {};
-    case "ODESLANA":
-      return { status: "VYSTAVENA", emails: sent };
+/** Stavy, podle kterých lze filtrovat seznam (uložené i odvozené z e-mailů a úhrad). */
+export const LIST_STATUS_FILTERS = [
+  "KONCEPT",
+  "VYSTAVENA",
+  "NEODESLANA",
+  "ODESLANA",
+  "NEUHRAZENA",
+  "PO_SPLATNOSTI",
+  "UHRAZENA",
+  "STORNOVANA",
+] as const;
+export type ListStatusFilter = (typeof LIST_STATUS_FILTERS)[number];
+
+function matchesFilter(status: DisplayStatus, filter: ListStatusFilter): boolean {
+  switch (filter) {
+    case "KONCEPT":
+    case "STORNOVANA":
+    case "UHRAZENA":
+    case "PO_SPLATNOSTI":
+      return status === filter;
+    case "VYSTAVENA":
+      return status !== "KONCEPT" && status !== "STORNOVANA";
     case "NEODESLANA":
-      return { status: "VYSTAVENA", type: "FAKTURA", emails: { none: { kind: "INVOICE", status: "SENT" } } };
-    default:
-      return { status };
+      return status === "VYSTAVENA";
+    case "ODESLANA":
+      return status === "ODESLANA";
+    case "NEUHRAZENA":
+      return status === "VYSTAVENA" || status === "ODESLANA" || status === "CASTECNE_UHRAZENA" || status === "PO_SPLATNOSTI";
   }
 }
 
-export async function listInvoices(filter: { year?: number; status?: string; customerId?: string } = {}) {
-  return prisma.invoice.findMany({
+export async function listInvoices(
+  filter: { year?: number; status?: string; customerId?: string; today?: string } = {},
+) {
+  const invoices = await prisma.invoice.findMany({
     where: {
       ...(filter.year ? { issueDate: { gte: `${filter.year}-01-01`, lte: `${filter.year}-12-31` } } : {}),
-      ...statusWhere(filter.status),
       ...(filter.customerId ? { customerId: filter.customerId } : {}),
     },
     orderBy: [{ issueDate: "desc" }, { createdAt: "desc" }],
-    include: { customer: { select: { id: true, name: true } }, ...SENT_EMAILS_COUNT },
+    include: { customer: { select: { id: true, name: true } }, ...STATUS_INCLUDE },
   });
+  const wanted = LIST_STATUS_FILTERS.find((f) => f === filter.status);
+  if (!wanted) return invoices;
+  const today = filter.today ?? todayPrague();
+  return invoices.filter((invoice) => matchesFilter(displayStatus(invoice, today), wanted));
 }

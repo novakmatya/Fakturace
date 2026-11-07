@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseAddressList } from "@/lib/email/address";
-import { queueInvoiceEmail } from "@/lib/email/invoice-email";
+import { type DocumentEmailKind, queueDocumentEmail } from "@/lib/email/invoice-email";
 import { kickOutboxAfterResponse } from "@/lib/email/kick";
 import { cancelQueuedEmail } from "@/lib/email/outbox";
 import { BODY_MAX, SUBJECT_MAX } from "@/lib/email/templates";
@@ -17,6 +17,7 @@ export type SendFormState = ActionResult & { values?: SendFormValues };
 export async function sendInvoiceEmailAction(_prev: SendFormState | null, formData: FormData): Promise<SendFormState> {
   await requireUser();
   const invoiceId = String(formData.get("invoiceId") ?? "");
+  const kind: DocumentEmailKind = formData.get("kind") === "REMINDER" ? "REMINDER" : "INVOICE";
   const values: SendFormValues = {
     to: String(formData.get("to") ?? ""),
     cc: String(formData.get("cc") ?? ""),
@@ -36,7 +37,7 @@ export async function sendInvoiceEmailAction(_prev: SendFormState | null, formDa
   if (!to.ok || !cc.ok || Object.keys(fieldErrors).length > 0) return { ok: false, fieldErrors, values };
 
   try {
-    await queueInvoiceEmail(invoiceId, {
+    await queueDocumentEmail(kind, invoiceId, {
       to: to.addresses,
       cc: cc.addresses,
       subject: values.subject,

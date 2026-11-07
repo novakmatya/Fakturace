@@ -10,7 +10,8 @@ import { pingGmailRelay } from "@/lib/email/transport";
 import { userMessage } from "@/lib/errors";
 import { requireUser } from "@/lib/session";
 import { getSupplier, updateAppSettings } from "@/lib/settings";
-import type { ActionResult } from "@/lib/validation";
+import { z } from "zod";
+import { type ActionResult, toFieldErrors } from "@/lib/validation";
 
 function templateKey(formData: FormData): TemplateKey {
   const key = String(formData.get("key") ?? "");
@@ -40,14 +41,15 @@ export async function saveTemplateAction(_prev: ActionResult | null, formData: F
     return { ok: false, error: error instanceof TemplateError ? error.message : userMessage(error) };
   }
   revalidatePath("/nastaveni/emaily");
-  redirect("/nastaveni/emaily?sablona=ulozena");
+  redirect(`/nastaveni/emaily?sablona=ulozena&klic=${key}`);
 }
 
 export async function resetTemplateAction(formData: FormData) {
   await requireUser();
-  await resetTemplate(templateKey(formData));
+  const key = templateKey(formData);
+  await resetTemplate(key);
   revalidatePath("/nastaveni/emaily");
-  redirect("/nastaveni/emaily?sablona=vychozi");
+  redirect(`/nastaveni/emaily?sablona=vychozi&klic=${key}`);
 }
 
 export async function sendTestEmailAction() {
@@ -75,5 +77,29 @@ export async function pingRelayAction(): Promise<ActionResult> {
       result.remaining === null
         ? "Spojení se skriptem funguje."
         : `Spojení se skriptem funguje. Dnes můžete odeslat ještě ${result.remaining} e-mailů.`,
+  };
+}
+
+const reminderSettingsSchema = z.object({
+  remindersAuto: z.boolean(),
+  reminderFirstDays: z.coerce.number().int("Celé číslo.").min(1, "Nejméně 1 den.").max(90, "Nejvýše 90 dní."),
+  reminderRepeatDays: z.coerce.number().int("Celé číslo.").min(0, "Nejméně 0.").max(90, "Nejvýše 90 dní."),
+  reminderMaxCount: z.coerce.number().int("Celé číslo.").min(1, "Nejméně 1.").max(10, "Nejvýše 10."),
+});
+
+export async function saveReminderSettingsAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  await requireUser();
+  const parsed = reminderSettingsSchema.safeParse({
+    remindersAuto: formData.get("remindersAuto") === "on",
+    reminderFirstDays: formData.get("reminderFirstDays"),
+    reminderRepeatDays: formData.get("reminderRepeatDays"),
+    reminderMaxCount: formData.get("reminderMaxCount"),
+  });
+  if (!parsed.success) return { ok: false, fieldErrors: toFieldErrors(parsed.error) };
+  await updateAppSettings(parsed.data);
+  revalidatePath("/nastaveni/emaily");
+  return {
+    ok: true,
+    message: parsed.data.remindersAuto ? "Automatické upomínky jsou zapnuté." : "Nastavení upomínek je uložené (automatika vypnutá).",
   };
 }

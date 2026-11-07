@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Alert, Badge, ButtonLink, Card, CardTitle, PageHeader } from "@/components/ui";
 import { getCustomer } from "@/lib/customers";
 import { formatCzDate } from "@/lib/dates";
+import { todayPrague } from "@/lib/dates";
 import { invoiceStatusBadge } from "@/lib/invoices/display";
 import { listInvoices } from "@/lib/invoices/service";
 import { formatCzk } from "@/lib/money";
@@ -19,6 +20,7 @@ export default async function CustomerPage({ params, searchParams }: PageProps<"
   const { id } = await params;
   const customer = await getCustomer(id);
   if (!customer) notFound();
+  const today = todayPrague();
   const [sources, invoices, query] = await Promise.all([
     listIncomeSources(),
     listInvoices({ customerId: id }),
@@ -78,7 +80,7 @@ export default async function CustomerPage({ params, searchParams }: PageProps<"
           ) : (
             <ul className="divide-y divide-line text-sm">
               {invoices.map((inv) => {
-                const badge = invoiceStatusBadge(inv);
+                const badge = invoiceStatusBadge(inv, today);
                 return (
                   <li key={inv.id} className="flex items-center justify-between gap-3 py-2.5">
                     <div>

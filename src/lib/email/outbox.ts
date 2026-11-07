@@ -4,7 +4,7 @@ import { emailConfig, type EmailConfig } from "@/lib/email/config";
 import { deliverEmail, EmailDeliveryError } from "@/lib/email/transport";
 import { readStoredFile } from "@/lib/files";
 
-export type EmailKind = "INVOICE" | "TEST";
+export type EmailKind = "INVOICE" | "REMINDER" | "TEST";
 export type EmailStatus = "QUEUED" | "SENDING" | "SENT" | "FAILED" | "CANCELLED";
 
 /** Po kolika minutách se zkouší znovu (index = počet dosavadních pokusů). */
@@ -27,6 +27,10 @@ export type QueueEmailInput = {
   attachmentFileId?: string | null;
   attachmentName?: string | null;
   auto?: boolean;
+  /** Unikátní klíč proti duplicitám automatických e-mailů (např. upomínek). */
+  dedupeKey?: string | null;
+  /** Okamžik zařazení (výchozí: teď). */
+  now?: Date;
 };
 
 export async function queueEmail(input: QueueEmailInput, client: Tx = prisma) {
@@ -46,6 +50,8 @@ export async function queueEmail(input: QueueEmailInput, client: Tx = prisma) {
       attachmentFileId: input.attachmentFileId ?? null,
       attachmentName: input.attachmentName ?? null,
       auto: input.auto ?? false,
+      dedupeKey: input.dedupeKey ?? null,
+      ...(input.now ? { queuedAt: input.now, nextAttemptAt: input.now } : {}),
     },
   });
   await audit(

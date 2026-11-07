@@ -10,6 +10,10 @@ export type AppSettingsUpdate = Partial<{
   roundInvoiceTotal: boolean;
   emailAutoSendOnIssue: boolean;
   emailBccSelf: boolean;
+  remindersAuto: boolean;
+  reminderFirstDays: number;
+  reminderRepeatDays: number;
+  reminderMaxCount: number;
 }>;
 
 export async function updateAppSettings(data: AppSettingsUpdate) {

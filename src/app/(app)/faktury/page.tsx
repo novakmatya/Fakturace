@@ -13,18 +13,21 @@ const STATUSES = [
   { value: "", label: "Všechny stavy" },
   { value: "KONCEPT", label: "Koncepty" },
   { value: "VYSTAVENA", label: "Vystavené (vše)" },
-  { value: "NEODESLANA", label: "Vystavené – neodeslané" },
-  { value: "ODESLANA", label: "Odeslané" },
+  { value: "NEODESLANA", label: "Neodeslané" },
+  { value: "NEUHRAZENA", label: "Neuhrazené" },
+  { value: "PO_SPLATNOSTI", label: "Po splatnosti" },
+  { value: "UHRAZENA", label: "Uhrazené" },
   { value: "STORNOVANA", label: "Stornované" },
 ];
 
 export default async function InvoicesPage({ searchParams }: PageProps<"/faktury">) {
   await requireUser();
   const query = await searchParams;
-  const currentYear = yearOf(todayPrague());
+  const today = todayPrague();
+  const currentYear = yearOf(today);
   const year = Number(query.rok) || currentYear;
   const status = typeof query.stav === "string" && STATUSES.some((s) => s.value === query.stav) ? query.stav : "";
-  const invoices = await listInvoices({ year, status: status || undefined });
+  const invoices = await listInvoices({ year, status: status || undefined, today });
   const years = Array.from({ length: 6 }, (_, i) => currentYear + 1 - i);
   const issuedTotal = invoices
     .filter((i) => i.status === "VYSTAVENA" && i.type === "FAKTURA")
@@ -85,7 +88,7 @@ export default async function InvoicesPage({ searchParams }: PageProps<"/faktury
             </thead>
             <tbody className="divide-y divide-line">
               {invoices.map((inv) => {
-                const badge = invoiceStatusBadge(inv);
+                const badge = invoiceStatusBadge(inv, today);
                 return (
                   <tr key={inv.id} className="hover:bg-panel/50">
                     <td className="tabular px-4 py-3">

@@ -146,7 +146,7 @@ describe("odeslání faktury", () => {
     expect(stored.status).toBe("SENT");
     expect(stored.providerMessageId).toBe(received.id);
     expect(stored.attempts).toBe(1);
-    expect(invoiceStatusBadge(fresh!).label).toBe("Odeslána");
+    expect(invoiceStatusBadge(fresh!, "2026-11-06").label).toBe("Odeslána");
   });
 
   it("bez skryté kopie, když je vypnutá", async () => {

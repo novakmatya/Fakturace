@@ -1,19 +1,34 @@
 import { processOutbox } from "@/lib/email/outbox";
+import { runReminderJob } from "@/lib/email/reminders";
 
 /** Jak často worker kontroluje frontu (opakované pokusy, zprávy zařazené jinde). */
 const INTERVAL_MS = 15_000;
+/** Upomínky stačí kontrolovat jednou za hodinu (odcházejí jen v pracovní době). */
+const REMINDER_INTERVAL_MS = 60 * 60_000;
 
 let running: Promise<void> | null = null;
+let lastReminderRun = 0;
+
+async function cycle(): Promise<void> {
+  if (Date.now() - lastReminderRun >= REMINDER_INTERVAL_MS) {
+    lastReminderRun = Date.now();
+    try {
+      const reminders = await runReminderJob();
+      if (reminders.queued) console.info(`[upomínky] zařazeno ${reminders.queued}`);
+    } catch (error) {
+      console.error("[upomínky] kontrola selhala", error);
+    }
+  }
+  const r = await processOutbox();
+  if (r.sent || r.failed || r.retried) {
+    console.info(`[e-maily] odesláno ${r.sent}, opakování ${r.retried}, chyby ${r.failed}`);
+  }
+}
 
 /** Zpracuje frontu; souběžná volání ve stejném procesu se spojí do jednoho běhu. */
 export function kickOutbox(): Promise<void> {
   if (!running) {
-    running = processOutbox()
-      .then((r) => {
-        if (r.sent || r.failed || r.retried) {
-          console.info(`[e-maily] odesláno ${r.sent}, opakování ${r.retried}, chyby ${r.failed}`);
-        }
-      })
+    running = cycle()
       .catch((error: unknown) => {
         console.error("[e-maily] zpracování fronty selhalo", error);
       })

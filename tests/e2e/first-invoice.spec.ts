@@ -133,4 +133,14 @@ test("od instalace k vystavené faktuře s PDF", async ({ page }) => {
   const anonymous = await anonymousContext.get(new URL(href!, page.url()).toString());
   expect(anonymous.status()).toBe(401);
   await anonymousContext.dispose();
+
+  // 10) Úhrada jedním klikem → stav Uhrazena, příjem v přehledu podle data úhrady
+  await page.getByRole("button", { name: /Uhrazeno dnes/ }).click();
+  await expect(page.getByText("Uhrazena", { exact: true })).toBeVisible();
+  await expect(page.getByText("Uhrazeno v plné výši")).toBeVisible();
+  await page.screenshot({ path: path.join(shots, "09-uhrazeno.png"), fullPage: true });
+  await page.getByRole("link", { name: "Přehled" }).first().click();
+  await expect(page.getByText(`Přijato ${pragueYear}`)).toBeVisible();
+  await expect(page.getByText("3 000,00 Kč").first()).toBeVisible();
+  await page.screenshot({ path: path.join(shots, "10-prehled.png"), fullPage: true });
 });

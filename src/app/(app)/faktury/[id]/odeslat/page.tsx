@@ -5,7 +5,7 @@ import { Alert, ButtonLink, Card, CardTitle, DefinitionList, PageHeader } from "
 import { formatCzDateTime } from "@/lib/dates";
 import { formatMailbox } from "@/lib/email/address";
 import { emailConfig } from "@/lib/email/config";
-import { buildInvoiceEmailDraft } from "@/lib/email/invoice-email";
+import { buildDocumentEmailDraft } from "@/lib/email/invoice-email";
 import { listEmailsForInvoice, parseStoredList } from "@/lib/email/outbox";
 import { getInvoice } from "@/lib/invoices/service";
 import type { SupplierSnapshot } from "@/lib/invoices/types";
@@ -15,18 +15,19 @@ import { SendInvoiceForm } from "./send-form";
 
 export const metadata: Metadata = { title: "Odeslat fakturu" };
 
-export default async function SendInvoicePage({ params }: PageProps<"/faktury/[id]/odeslat">) {
+export default async function SendInvoicePage({ params, searchParams }: PageProps<"/faktury/[id]/odeslat">) {
   await requireUser();
-  const { id } = await params;
+  const [{ id }, query] = await Promise.all([params, searchParams]);
   const invoice = await getInvoice(id);
   if (!invoice) notFound();
   if (!invoice.number) redirect(`/faktury/${id}`);
+  const kind = query.typ === "upominka" ? "REMINDER" : "INVOICE";
 
   const config = emailConfig();
   const header = (
     <PageHeader
       eyebrow={<Link href={`/faktury/${id}`}>Faktura {invoice.number}</Link>}
-      title="Odeslat e-mailem"
+      title={kind === "REMINDER" ? "Poslat upomínku" : "Odeslat e-mailem"}
       description="Text je předvyplněný ze šablony. Úpravy platí jen pro tento e-mail."
     />
   );
@@ -54,12 +55,12 @@ export default async function SendInvoicePage({ params }: PageProps<"/faktury/[i
   }
 
   const [draft, settings, history] = await Promise.all([
-    buildInvoiceEmailDraft(id),
+    buildDocumentEmailDraft(kind, id),
     getAppSettings(),
     listEmailsForInvoice(id),
   ]);
   const supplier = JSON.parse(invoice.supplierSnapshot ?? "{}") as SupplierSnapshot;
-  const lastSent = history.find((m) => m.status === "SENT");
+  const lastSent = history.find((m) => m.status === "SENT" && m.kind === kind);
   const from = formatMailbox(config.from.name ?? supplier.name, config.from.address);
   const replyTo = supplier.email && supplier.email.toLowerCase() !== config.from.address.toLowerCase() ? supplier.email : null;
   const pdfSizeKb = invoice.pdfFile ? Math.max(1, Math.round(invoice.pdfFile.sizeBytes / 1024)) : null;
@@ -70,8 +71,8 @@ export default async function SendInvoicePage({ params }: PageProps<"/faktury/[i
       {lastSent?.sentAt ? (
         <div className="mb-6">
           <Alert tone="accent">
-            Faktura už byla odeslána {formatCzDateTime(lastSent.sentAt)} na {parseStoredList(lastSent.toAddresses).join(", ")}.
-            Nový e-mail odejde jako další zpráva.
+            {kind === "REMINDER" ? "Poslední upomínka odešla" : "Faktura už byla odeslána"} {formatCzDateTime(lastSent.sentAt)} na{" "}
+            {parseStoredList(lastSent.toAddresses).join(", ")}. Nový e-mail odejde jako další zpráva.
           </Alert>
         </div>
       ) : null}
@@ -87,6 +88,7 @@ export default async function SendInvoicePage({ params }: PageProps<"/faktury/[i
         <Card>
           <SendInvoiceForm
             invoiceId={id}
+            kind={kind}
             defaults={{ to: draft.to, cc: draft.cc, subject: draft.subject, body: draft.body }}
           />
         </Card>

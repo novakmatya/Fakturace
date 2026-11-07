@@ -1,16 +1,19 @@
 // Čistá logika šablon (bez databáze) – používá ji server i editor v prohlížeči.
 
-export const TEMPLATE_KEYS = ["INVOICE"] as const;
+export const TEMPLATE_KEYS = ["INVOICE", "REMINDER"] as const;
 export type TemplateKey = (typeof TEMPLATE_KEYS)[number];
 
 export const TEMPLATE_LABEL: Record<TemplateKey, string> = {
   INVOICE: "Odeslání faktury",
+  REMINDER: "Upomínka",
 };
 
 /** Proměnné, které lze v šabloně použít, s popisem a ukázkovou hodnotou pro náhled. */
 export const PLACEHOLDERS = {
   cislo: { label: "číslo dokladu", sample: "20260001" },
   castka: { label: "částka k úhradě", sample: "12 100,00 Kč" },
+  zbyva: { label: "zbývá uhradit (po započtení úhrad)", sample: "12 100,00 Kč" },
+  dni_po_splatnosti: { label: "počet dní po splatnosti", sample: "9" },
   splatnost: { label: "datum splatnosti", sample: "21. 11. 2026" },
   datum_vystaveni: { label: "datum vystavení", sample: "7. 11. 2026" },
   vs: { label: "variabilní symbol", sample: "20260001" },
@@ -30,6 +33,22 @@ export type PlaceholderName = keyof typeof PLACEHOLDERS;
 export type TemplateVars = Record<PlaceholderName, string>;
 
 export const DEFAULT_TEMPLATES: Record<TemplateKey, { subject: string; body: string }> = {
+  REMINDER: {
+    subject: "Upomínka – faktura č. {cislo}",
+    body: [
+      "Dobrý den,",
+      "",
+      "dovoluji si Vás upozornit, že faktura č. {cislo} se splatností {splatnost} dosud není uhrazena. Zbývá uhradit {zbyva}.",
+      "",
+      "{platebni_udaje}",
+      "",
+      "Pokud jste platbu mezitím odeslali, považujte prosím tento e-mail za bezpředmětný a děkuji za ni.",
+      "",
+      "S pozdravem",
+      "",
+      "{podpis}",
+    ].join("\n"),
+  },
   INVOICE: {
     subject: "Faktura č. {cislo} – {dodavatel}",
     body: [

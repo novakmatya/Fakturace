@@ -10,12 +10,13 @@ import { env } from "@/env";
 import { EMAIL_MODE_LABEL, emailConfig, GMAIL_SECRET_MIN } from "@/lib/email/config";
 import { gmailRelayScript } from "@/lib/email/gmail-relay-script";
 import { formatMailbox } from "@/lib/email/address";
-import { getTemplate, TEMPLATE_LABEL } from "@/lib/email/templates";
+import { getTemplate, TEMPLATE_LABEL, type TemplateKey } from "@/lib/email/templates";
 import { requireUser } from "@/lib/session";
 import { getAppSettings, getSupplier } from "@/lib/settings";
 import { resetTemplateAction, sendTestEmailAction } from "./actions";
 import { EmailSettingsForm } from "./email-settings-form";
 import { RelayCheck } from "./relay-check";
+import { ReminderSettingsForm } from "./reminder-settings-form";
 import { TemplateEditor } from "./template-editor";
 
 export const metadata: Metadata = { title: "E-maily" };
@@ -32,10 +33,11 @@ export default async function EmailSettingsPage({ searchParams }: PageProps<"/na
   await requireUser();
   const query = await searchParams;
   const config = emailConfig();
-  const [settings, supplier, template, tests] = await Promise.all([
+  const [settings, supplier, invoiceTemplate, reminderTemplate, tests] = await Promise.all([
     getAppSettings(),
     getSupplier(),
     getTemplate("INVOICE"),
+    getTemplate("REMINDER"),
     prisma.emailMessage.findMany({ where: { kind: "TEST" }, orderBy: { queuedAt: "desc" }, take: 3 }),
   ]);
   const testPending = tests.some((t) => t.status === "SENDING" || (t.status === "QUEUED" && t.attempts === 0));
@@ -45,38 +47,22 @@ export default async function EmailSettingsPage({ searchParams }: PageProps<"/na
       <PageHeader
         eyebrow={<Link href="/nastaveni">Nastavení</Link>}
         title="E-maily"
-        description="Odesílání faktur, šablona e-mailu a kopie pro vás."
+        description="Odesílání faktur a upomínek, šablony e-mailů a kopie pro vás."
       />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <Card>
-          <CardTitle hint="Proměnné ve složených závorkách se při odeslání nahradí údaji z faktury.">
-            Šablona: {TEMPLATE_LABEL.INVOICE.toLowerCase()}
-          </CardTitle>
-          {query.sablona === "ulozena" ? (
-            <div className="mb-4">
-              <Alert tone="ok">Šablona je uložená. Platí pro e-maily připravené od této chvíle.</Alert>
-            </div>
-          ) : null}
-          {query.sablona === "vychozi" ? (
-            <div className="mb-4">
-              <Alert tone="ok">Šablona je vrácená na výchozí text.</Alert>
-            </div>
-          ) : null}
-          <TemplateEditor
-            key={JSON.stringify([template.subject, template.body])}
+        <div className="min-w-0 space-y-6">
+          <TemplateCard
             templateKey="INVOICE"
-            initial={{ subject: template.subject, body: template.body }}
+            template={invoiceTemplate}
+            notice={query.klic === "INVOICE" || !query.klic ? query.sablona : undefined}
           />
-          {template.custom ? (
-            <form action={resetTemplateAction} className="mt-4 border-t border-line pt-4">
-              <input type="hidden" name="key" value="INVOICE" />
-              <button type="submit" className="text-[13px] text-muted underline-offset-4 hover:text-ink hover:underline">
-                Obnovit výchozí text šablony
-              </button>
-            </form>
-          ) : null}
-        </Card>
+          <TemplateCard
+            templateKey="REMINDER"
+            template={reminderTemplate}
+            notice={query.klic === "REMINDER" ? query.sablona : undefined}
+          />
+        </div>
 
         <div className="space-y-6">
           <Card>
@@ -146,6 +132,16 @@ export default async function EmailSettingsPage({ searchParams }: PageProps<"/na
                 ) : null}
               </div>
             ) : null}
+          </Card>
+
+          <Card>
+            <CardTitle hint="Neuhrazené faktury po splatnosti. Ručně ji pošlete z detailu faktury.">Upomínky</CardTitle>
+            <ReminderSettingsForm
+              auto={settings.remindersAuto}
+              firstDays={settings.reminderFirstDays}
+              repeatDays={settings.reminderRepeatDays}
+              maxCount={settings.reminderMaxCount}
+            />
           </Card>
 
           <Card>
@@ -248,6 +244,47 @@ function GmailSetup({ configured, secret }: { configured: boolean; secret: strin
         Běžný účet Gmail smí přes skripty odeslat 100 e-mailů denně. Klíč ve skriptu nikomu neposílejte – kdo ho zná, může přes váš
         Gmail odesílat e-maily.
       </p>
+    </Card>
+  );
+}
+
+function TemplateCard({
+  templateKey,
+  template,
+  notice,
+}: {
+  templateKey: TemplateKey;
+  template: { subject: string; body: string; custom: boolean };
+  notice: string | string[] | undefined;
+}) {
+  return (
+    <Card>
+      <CardTitle hint="Proměnné ve složených závorkách se při odeslání nahradí údaji z faktury.">
+        Šablona: {TEMPLATE_LABEL[templateKey].toLowerCase()}
+      </CardTitle>
+      {notice === "ulozena" ? (
+        <div className="mb-4">
+          <Alert tone="ok">Šablona je uložená. Platí pro e-maily připravené od této chvíle.</Alert>
+        </div>
+      ) : null}
+      {notice === "vychozi" ? (
+        <div className="mb-4">
+          <Alert tone="ok">Šablona je vrácená na výchozí text.</Alert>
+        </div>
+      ) : null}
+      <TemplateEditor
+        key={JSON.stringify([template.subject, template.body])}
+        templateKey={templateKey}
+        initial={{ subject: template.subject, body: template.body }}
+      />
+      {template.custom ? (
+        <form action={resetTemplateAction} className="mt-4 border-t border-line pt-4">
+          <input type="hidden" name="key" value={templateKey} />
+          <button type="submit" className="text-[13px] text-muted underline-offset-4 hover:text-ink hover:underline">
+            Obnovit výchozí text šablony
+          </button>
+        </form>
+      ) : null}
     </Card>
   );
 }
