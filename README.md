@@ -48,6 +48,8 @@ služby nepodporuje).
    `DATA_DIR=/data` je nastavené v image. `APP_URL` musí přesně odpovídat adrese
    v prohlížeči, jinak přihlášení odmítne požadavek. Proměnné pro e-maily viz níže.
 5. **Settings → Deploy → Healthcheck Path:** `/api/zdravi`.
+   V nastavení služby zapněte také **Wait for CI** – nová verze se nasadí, jen když
+   na GitHubu projdou všechny kontroly (lint, testy, build, Docker image).
 6. Otevřete adresu aplikace → průvodce **Instalace** → zadejte `SETUP_TOKEN`,
    založte účet → přihlaste se → nastavte dvoufázové ověření a uložte si záložní kódy.
 
