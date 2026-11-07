@@ -92,3 +92,15 @@ export async function toggleIncomeSourceArchiveAction(formData: FormData) {
   await setIncomeSourceArchived(id, formData.get("archived") === "true");
   revalidatePath("/nastaveni/cinnosti");
 }
+
+export async function backupNowAction(): Promise<ActionResult> {
+  await requireUser();
+  try {
+    const { runBackup } = await import("@/lib/backup");
+    await runBackup({ actor: "USER" });
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Záloha selhala." };
+  }
+  revalidatePath("/nastaveni");
+  return { ok: true, message: "Záloha je hotová." };
+}

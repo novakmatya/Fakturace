@@ -23,6 +23,9 @@ const schema = z.object({
   RESEND_API_KEY: z.string().optional(),
   RESEND_API_URL: z.url().default("https://api.resend.com"),
   MAIL_FROM: z.string().optional(),
+  // Šifrované zálohy (denně): kam a jakým heslem. Bez nich se nezálohuje.
+  BACKUP_DIR: z.string().optional(),
+  BACKUP_PASSWORD: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

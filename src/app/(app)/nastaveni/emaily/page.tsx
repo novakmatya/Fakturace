@@ -171,12 +171,13 @@ function GmailSetup({ configured, secret }: { configured: boolean; secret: strin
   const script = gmailRelayScript(secret);
   const steps: { title: string; body: React.ReactNode }[] = [
     {
-      title: "Proměnné na Railway",
+      title: "Proměnné",
       body: (
         <>
-          V proměnných služby nastavte <code>GMAIL_RELAY_SECRET</code> (náhodný klíč, např. výstup{" "}
-          <code>openssl rand -hex 24</code>) a <code>MAIL_FROM</code> ve tvaru <code>Jméno Příjmení &lt;vas.ucet@gmail.com&gt;</code>.
-          {secret ? " Klíč je nastavený a níže ve skriptu už je doplněný." : " Po uložení se aplikace restartuje a klíč se objeví ve skriptu níže."}
+          Na Macu je klíč <code>GMAIL_RELAY_SECRET</code> už vygenerovaný v souboru <code>.env</code> ve složce Fakturace;
+          na Railway ho nastavte v proměnných služby (výstup <code>openssl rand -hex 24</code>). Doplňte i{" "}
+          <code>MAIL_FROM</code> ve tvaru <code>Jméno Příjmení &lt;vas.ucet@gmail.com&gt;</code>.
+          {secret ? " Klíč je nastavený a níže ve skriptu už je doplněný." : " Po uložení a restartu aplikace se klíč objeví ve skriptu níže."}
         </>
       ),
     },
@@ -204,11 +205,12 @@ function GmailSetup({ configured, secret }: { configured: boolean; secret: strin
       ),
     },
     {
-      title: "Adresa skriptu do Railway",
+      title: "Adresa skriptu do aplikace",
       body: (
         <>
-          Zkopírujte URL webové aplikace (končí <code>/exec</code>) a uložte ji na Railway jako <code>GMAIL_RELAY_URL</code>.
-          Pak tady klikněte na Ověřit spojení a pošlete si zkušební e-mail.
+          Zkopírujte URL webové aplikace (končí <code>/exec</code>) a uložte ji jako <code>GMAIL_RELAY_URL</code> – na Macu
+          do souboru <code>.env</code> a znovu spusťte Fakturaci, na Railway do proměnných služby. Pak tady klikněte na
+          Ověřit spojení a pošlete si zkušební e-mail.
         </>
       ),
     },

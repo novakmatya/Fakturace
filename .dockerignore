@@ -14,3 +14,4 @@ playwright-report
 *.tsbuildinfo
 npm-debug.log*
 .DS_Store
+**/.env

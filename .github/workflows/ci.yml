@@ -55,6 +55,13 @@ jobs:
       - name: Docker image
         run: docker build -t fakturace:ci .
 
+      - name: Balíček pro Mac (compose a spouštěč)
+        run: |
+          bash -n "mac/Spustit Fakturaci.command"
+          touch mac/.env
+          ZALOHY_DIR=/tmp docker compose -f mac/docker-compose.yml config --quiet
+          rm mac/.env
+
       - name: E2E proti Docker image (svazek připojený jako root)
         env:
           E2E_BASE_URL: http://localhost:3300

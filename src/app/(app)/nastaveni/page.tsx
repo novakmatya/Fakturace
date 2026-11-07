@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Card, CardTitle, PageHeader } from "@/components/ui";
+import { backupConfig, lastBackup } from "@/lib/backup";
+import { formatCzDateTime } from "@/lib/dates";
 import { emailConfig } from "@/lib/email/config";
 import { requireUser } from "@/lib/session";
 import { getAppSettings, getSupplier, listIncomeSources } from "@/lib/settings";
+import { BackupButton } from "./backup-button";
 import { AppSettingsForm } from "./app-settings-form";
 import { SupplierForm } from "./supplier-form";
 
@@ -21,6 +24,8 @@ export default async function SettingsPage() {
     : { country: "CZ", defaultDueDays: "14", vatNote: "Nejsem plátce DPH." };
 
   const email = emailConfig();
+  const backup = backupConfig();
+  const last = await lastBackup();
   const emailHint =
     email.mode === "resend"
       ? `Odesílání zapnuto (${email.from.address}).`
@@ -61,6 +66,26 @@ export default async function SettingsPage() {
             <Link href="/nastaveni/emaily" className="text-sm font-medium text-accent hover:underline">
               Šablona a odesílání →
             </Link>
+          </Card>
+          <Card>
+            <CardTitle hint="Šifrovaná záloha databáze a všech PDF, automaticky jednou denně.">Zálohy</CardTitle>
+            {backup.enabled ? (
+              <div className="space-y-3 text-sm">
+                <p>
+                  {last ? (
+                    <>
+                      Poslední záloha <span className="tabular">{formatCzDateTime(last.at)}</span>
+                      {last.file ? <span className="block break-all text-[13px] text-muted">{last.file}</span> : null}
+                    </>
+                  ) : (
+                    "Zatím žádná záloha."
+                  )}
+                </p>
+                <BackupButton />
+              </div>
+            ) : (
+              <p className="text-sm text-muted">{backup.reason}</p>
+            )}
           </Card>
           <Card>
             <CardTitle hint="Přihlášení heslem a kódem z ověřovací aplikace.">Zabezpečení</CardTitle>

@@ -33,7 +33,7 @@ COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 COPY --from=build /app/assets ./assets
 COPY --from=build /app/prisma/migrations ./prisma/migrations
-COPY --from=build /app/scripts/migrate.mjs ./scripts/migrate.mjs
+COPY --from=build /app/scripts/migrate.mjs /app/scripts/backup-core.mjs /app/scripts/restore-backup.mjs ./scripts/
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # Next.js si do .next zapisuje cache (např. statické trasy), proto ji vlastní
 # uživatel node. node_modules, server.js a migrace zůstávají vlastnictvím roota.

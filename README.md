@@ -25,7 +25,22 @@ Soukromá webová aplikace pro fakturaci a roční daňové podklady fyzické os
 | 8 | výdaje a účtenky, archiv | |
 | 9 | import výpisu (CSV) a párování podle VS | |
 | 10 | roční daňové podklady (§ 7 / § 9, paušál vs. skutečné výdaje) | čeká na ověření sazeb |
-| 11 | šifrované zálohy, export, archivní balík | |
+| 11 | šifrované denní zálohy a obnova (export a archivní balík později) | hotovo |
+
+## Provoz na Macu (bez serveru, zdarma)
+
+Aplikace poběží jen na jednom Macu (`http://localhost:3000`), data zůstávají v Dockeru
+a každý den se šifrovaně zálohují do iCloud Drive (složka `Fakturace-zalohy`).
+
+1. Nainstalujte **Docker Desktop** a v jeho nastavení zapněte *Start Docker Desktop when you sign in*.
+2. Složku s aplikací uložte např. do Dokumentů. Ve složce `mac` dvakrát klikněte na
+   **Spustit Fakturaci.command** (poprvé pravým tlačítkem → Otevřít).
+3. Při prvním spuštění se zobrazí **heslo k zálohám** (uložte ho do aplikace Hesla)
+   a **instalační kód** pro založení účtu. První sestavení trvá asi 5 minut.
+4. Aplikace se pak spouští sama s Dockerem; spouštěč stačí k otevření nebo po aktualizaci.
+
+Obnova ze zálohy: `node scripts/restore-backup.mjs <soubor.fakz> <prázdná-složka>`.
+Doporučení: zapněte FileVault (šifrování disku).
 
 ## Nasazení na Railway
 

@@ -40,7 +40,8 @@ function createAuth() {
       },
     },
     advanced: {
-      useSecureCookies: env.NODE_ENV === "production",
+      // Na https (Railway) zabezpečené cookies; lokálně na http://localhost by je Safari neuložil.
+      useSecureCookies: env.APP_URL.startsWith("https://"),
       defaultCookieAttributes: { sameSite: "lax", httpOnly: true },
     },
     databaseHooks: {

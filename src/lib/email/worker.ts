@@ -1,9 +1,10 @@
 import { processOutbox } from "@/lib/email/outbox";
+import { runDailyBackupIfDue } from "@/lib/backup";
 import { runReminderJob } from "@/lib/email/reminders";
 
 /** Jak často worker kontroluje frontu (opakované pokusy, zprávy zařazené jinde). */
 const INTERVAL_MS = 15_000;
-/** Upomínky stačí kontrolovat jednou za hodinu (odcházejí jen v pracovní době). */
+/** Upomínky a denní zálohu stačí kontrolovat jednou za hodinu. */
 const REMINDER_INTERVAL_MS = 60 * 60_000;
 
 let running: Promise<void> | null = null;
@@ -17,6 +18,11 @@ async function cycle(): Promise<void> {
       if (reminders.queued) console.info(`[upomínky] zařazeno ${reminders.queued}`);
     } catch (error) {
       console.error("[upomínky] kontrola selhala", error);
+    }
+    try {
+      if (await runDailyBackupIfDue()) console.info("[zálohy] denní záloha hotová");
+    } catch (error) {
+      console.error("[zálohy] záloha selhala", error);
     }
   }
   const r = await processOutbox();

@@ -35,7 +35,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Soukromá aplikace s daty za přihlášením: vše se renderuje dynamicky.
   cacheComponents: false,
-  serverExternalPackages: ["better-sqlite3", "@prisma/adapter-better-sqlite3", "@react-pdf/renderer"],
+  serverExternalPackages: ["better-sqlite3", "@prisma/adapter-better-sqlite3", "@react-pdf/renderer", "tar"],
   // Do standalone buildu patří fonty pro PDF a migrace; lokální data nikdy.
   outputFileTracingIncludes: {
     "/**": ["./assets/fonts/**", "./prisma/migrations/**"],
