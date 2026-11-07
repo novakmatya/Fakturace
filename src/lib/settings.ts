@@ -8,6 +8,7 @@ export async function getAppSettings() {
 
 export type AppSettingsUpdate = Partial<{
   roundInvoiceTotal: boolean;
+  salutation: string | null;
   emailAutoSendOnIssue: boolean;
   emailBccSelf: boolean;
   remindersAuto: boolean;

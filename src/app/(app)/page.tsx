@@ -8,6 +8,7 @@ import { displayStatus, invoiceStatusBadge, paidHalere, STATUS_INCLUDE } from "@
 import { formatCzk } from "@/lib/money";
 import { cashIncome } from "@/lib/payments/income";
 import { requireUser } from "@/lib/session";
+import { getAppSettings } from "@/lib/settings";
 import { czPlural } from "@/lib/text";
 
 export const metadata: Metadata = { title: "Přehled" };
@@ -29,7 +30,8 @@ export default async function DashboardPage() {
   const from = `${year}-01-01`;
   const to = `${year}-12-31`;
 
-  const [supplier, sourceCount, customerCount, issued, drafts, recent, open, income, failedEmails] = await Promise.all([
+  const [settings, supplier, sourceCount, customerCount, issued, drafts, recent, open, income, failedEmails] = await Promise.all([
+    getAppSettings(),
     prisma.supplierProfile.findUnique({ where: { id: 1 }, select: { id: true } }),
     prisma.incomeSource.count({ where: { archived: false } }),
     prisma.customer.count({ where: { archived: false } }),
@@ -68,12 +70,13 @@ export default async function DashboardPage() {
     { done: issued._count > 0 || open.length > 0, label: "Vystavit první fakturu", href: "/faktury/nova" },
   ];
   const setupDone = steps.every((s) => s.done);
-  const firstName = session.user.name.split(" ")[0];
+  // Vlastní oslovení (např. „Káťo“) je neformální, jinak zdvořilé s křestním jménem.
+  const greeting = settings.salutation ? `Ahoj, ${settings.salutation}` : `Dobrý den, ${session.user.name.split(" ")[0]}`;
 
   return (
     <>
       <PageHeader
-        title={`Dobrý den, ${firstName}`}
+        title={greeting}
         description={`Přehled roku ${year}.`}
         actions={<ButtonLink href="/faktury/nova">Nová faktura</ButtonLink>}
       />

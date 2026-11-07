@@ -56,7 +56,11 @@ export async function saveSupplierAction(_prev: FormState | null, formData: Form
 
 export async function saveAppSettingsAction(_prev: FormState | null, formData: FormData): Promise<FormState> {
   await requireUser();
-  await updateAppSettings({ roundInvoiceTotal: formData.get("roundInvoiceTotal") === "on" });
+  const salutation = String(formData.get("salutation") ?? "").trim().slice(0, 40);
+  await updateAppSettings({
+    roundInvoiceTotal: formData.get("roundInvoiceTotal") === "on",
+    salutation: salutation || null,
+  });
   revalidatePath("/nastaveni");
   return { ok: true, message: "Nastavení je uložené." };
 }

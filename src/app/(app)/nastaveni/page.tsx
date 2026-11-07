@@ -53,8 +53,8 @@ export default async function SettingsPage() {
             </Link>
           </Card>
           <Card>
-            <CardTitle>Faktury</CardTitle>
-            <AppSettingsForm roundInvoiceTotal={settings.roundInvoiceTotal} />
+            <CardTitle>Aplikace a faktury</CardTitle>
+            <AppSettingsForm roundInvoiceTotal={settings.roundInvoiceTotal} salutation={settings.salutation ?? ""} />
           </Card>
           <Card>
             <CardTitle hint={emailHint}>E-maily</CardTitle>

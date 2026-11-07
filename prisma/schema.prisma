@@ -20,6 +20,8 @@ datasource db {
 model AppSettings {
   id                   Int      @id @default(1)
   roundInvoiceTotal    Boolean  @default(false)
+  /// Jak aplikace oslovuje uživatele na přehledu (např. „Káťo“). Prázdné = křestní jméno.
+  salutation           String?
   /// Po vystavení faktury rovnou odeslat e-mail odběrateli (lze změnit u každé faktury).
   emailAutoSendOnIssue Boolean  @default(true)
   /// Posílat skrytou kopii každého e-mailu na e-mail dodavatele.

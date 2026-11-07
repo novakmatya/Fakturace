@@ -1,14 +1,27 @@
 "use client";
 
 import { useActionState } from "react";
-import { CheckboxField, FormMessage, SubmitButton } from "@/components/form-controls";
+import { CheckboxField, FormMessage, SubmitButton, TextField } from "@/components/form-controls";
 import { saveAppSettingsAction, type FormState } from "./actions";
 
-export function AppSettingsForm({ roundInvoiceTotal }: { roundInvoiceTotal: boolean }) {
+export function AppSettingsForm({
+  roundInvoiceTotal,
+  salutation,
+}: {
+  roundInvoiceTotal: boolean;
+  salutation: string;
+}) {
   const [state, action] = useActionState<FormState | null, FormData>(saveAppSettingsAction, null);
   return (
     <form action={action} className="space-y-4">
       <FormMessage state={state} />
+      <TextField
+        name="salutation"
+        label="Oslovení v aplikaci"
+        hint="Např. Káťo. Prázdné = křestní jméno."
+        defaultValue={salutation}
+        maxLength={40}
+      />
       <CheckboxField
         name="roundInvoiceTotal"
         label="Zaokrouhlovat celkovou částku faktury na celé koruny"
